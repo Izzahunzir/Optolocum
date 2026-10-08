@@ -254,7 +254,7 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
           SafeArea(
             child: Align(
               alignment: Alignment.topLeft,
-              child: BackButton(color: Colors.white),
+              child: const CompanyOwnerBackButton(),
             ),
           ),
         ],

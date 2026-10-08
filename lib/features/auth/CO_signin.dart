@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'CO_header.dart';
 import 'CO_signup.dart';
+import '../clinic_owner/CO_verify_popup.dart';
 
 class CompanyOwnerSigninPage extends StatefulWidget {
   const CompanyOwnerSigninPage({super.key});
@@ -23,7 +24,8 @@ class _CompanyOwnerSigninPageState extends State<CompanyOwnerSigninPage> {
   void _login() {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
-    _showMessage('Sign in is coming soon.');
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const COVerifyPopup()));
   }
 
   InputDecoration _decoration(String hint) => InputDecoration(
@@ -221,7 +223,7 @@ class _CompanyOwnerSigninPageState extends State<CompanyOwnerSigninPage> {
           const SafeArea(
             child: Align(
               alignment: Alignment.topLeft,
-              child: BackButton(color: Colors.white),
+              child: CompanyOwnerBackButton(),
             ),
           ),
         ],

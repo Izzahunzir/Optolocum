@@ -103,10 +103,10 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byType(BackButton));
+    await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(find.text('Login as a'), findsOneWidget);
-    await tester.tap(find.byType(BackButton));
+    await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(find.text('Welcome to\nOptolocum'), findsOneWidget);
   });

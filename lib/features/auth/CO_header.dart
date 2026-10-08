@@ -1,5 +1,27 @@
 import 'package:flutter/material.dart';
 
+class CompanyOwnerBackButton extends StatelessWidget {
+  const CompanyOwnerBackButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12),
+      child: IconButton(
+        tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+        onPressed: () => Navigator.of(context).maybePop(),
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        padding: EdgeInsets.zero,
+        icon: const Icon(
+          Icons.arrow_back_ios_new_rounded,
+          size: 16,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+}
+
 class CompanyOwnerHeaderPainter extends CustomPainter {
   const CompanyOwnerHeaderPainter();
 
