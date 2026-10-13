@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'CO_header.dart';
 import 'CO_signup.dart';
 import '../clinic_owner/CO_verify_popup.dart';
+import '../clinic_owner/CO_forgotpass.dart';
 
 class CompanyOwnerSigninPage extends StatefulWidget {
   const CompanyOwnerSigninPage({super.key});
@@ -14,12 +15,6 @@ class CompanyOwnerSigninPage extends StatefulWidget {
 class _CompanyOwnerSigninPageState extends State<CompanyOwnerSigninPage> {
   static const _blue = Color(0xFF263C80);
   final _formKey = GlobalKey<FormState>();
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
 
   void _login() {
     if (!_formKey.currentState!.validate()) return;
@@ -149,8 +144,11 @@ class _CompanyOwnerSigninPageState extends State<CompanyOwnerSigninPage> {
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: TextButton(
-                                    onPressed: () => _showMessage(
-                                      'Password recovery is coming soon.',
+                                    onPressed: () => Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const CompanyOwnerForgotPasswordPage(),
+                                      ),
                                     ),
                                     style: TextButton.styleFrom(
                                       foregroundColor: Colors.black,

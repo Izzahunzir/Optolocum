@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../auth/CO_signin.dart';
+import '../auth_locum/L_signin.dart';
 
 /// Initial role selection. Connect callbacks when the next screens exist.
 class IntroPage extends StatelessWidget {
@@ -19,115 +20,117 @@ class IntroPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEEF5F6),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final scale = (constraints.maxWidth / 390).clamp(0.85, 1.3);
-            final horizontalPadding = constraints.maxWidth >= 600
-                ? (constraints.maxWidth -
-                          math.min(constraints.maxWidth * 0.8, 960)) /
-                      2
-                : 29 * scale;
-            // Adapt spacing to available height while allowing scrolling
-            // for compact windows and larger accessibility text.
-            final spacing = ((constraints.maxHeight - 350 * scale) / 538).clamp(
-              0.08,
-              1.0,
-            );
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minWidth: constraints.maxWidth,
-                  maxWidth: constraints.maxWidth,
-                  minHeight: constraints.maxHeight,
-                ),
-                child: Stack(
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(height: 160 * spacing),
-                          Text(
-                            'Welcome to\nOptolocum',
-                            style: TextStyle(
-                              fontSize: 34 * scale,
-                              height: 1.22,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.8 * scale,
-                              color: Colors.black,
-                            ),
-                          ),
-                          SizedBox(height: 10 * scale),
-                          Text(
-                            'Connecting optometrists\nwith opportunities',
-                            style: TextStyle(
-                              fontSize: 18 * scale,
-                              height: 1.2,
-                              color: Colors.black,
-                            ),
-                          ),
-                          SizedBox(height: 212 * spacing),
-                          Center(
-                            child: Text(
-                              'See better careers ahead',
-                              textAlign: TextAlign.center,
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/intro_background.jpeg'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final scale = (constraints.maxWidth / 390).clamp(0.85, 1.3);
+              final horizontalPadding = constraints.maxWidth >= 600
+                  ? (constraints.maxWidth -
+                            math.min(constraints.maxWidth * 0.8, 960)) /
+                        2
+                  : 29 * scale;
+              // Adapt spacing to available height while allowing scrolling
+              // for compact windows and larger accessibility text.
+              final spacing = ((constraints.maxHeight - 350 * scale) / 538)
+                  .clamp(0.08, 1.0);
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minWidth: constraints.maxWidth,
+                    maxWidth: constraints.maxWidth,
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(height: 160 * spacing),
+                            Text(
+                              'Welcome to\nOptolocum',
                               style: TextStyle(
-                                fontSize: 22 * scale,
-                                height: 1.3,
+                                fontSize: 34 * scale,
+                                height: 1.22,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.8 * scale,
                                 color: Colors.black,
                               ),
                             ),
-                          ),
-                          SizedBox(height: 40 * spacing),
-                          IntroRoleButton(
-                            label: 'Locum',
-                            description: 'Locum looking for vacancies',
-                            color: const Color(0xFF237F7D),
-                            scale: scale,
-                            onPressed:
-                                onLocumSelected ??
-                                () => _showSelection(context, 'Locum'),
-                          ),
-                          SizedBox(height: 39 * spacing),
-                          IntroRoleButton(
-                            label: 'Clinic Owner',
-                            description: 'Clinic owner looking for Locums',
-                            color: const Color(0xFF263C80),
-                            scale: scale,
-                            onPressed:
-                                onClinicOwnerSelected ??
-                                () => Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        const CompanyOwnerSigninPage(),
-                                  ),
+                            SizedBox(height: 10 * scale),
+                            Text(
+                              'Connecting optometrists\nwith opportunities',
+                              style: TextStyle(
+                                fontSize: 18 * scale,
+                                height: 1.2,
+                                color: Colors.black,
+                              ),
+                            ),
+                            SizedBox(height: 212 * spacing),
+                            Center(
+                              child: Text(
+                                'See better careers ahead',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 22 * scale,
+                                  height: 1.3,
+                                  color: Colors.black,
                                 ),
-                          ),
-                          SizedBox(height: 87 * spacing),
-                        ],
+                              ),
+                            ),
+                            SizedBox(height: 40 * spacing),
+                            IntroRoleButton(
+                              label: 'Locum',
+                              description: 'Locum looking for vacancies',
+                              color: const Color(0xFF237F7D),
+                              scale: scale,
+                              onPressed:
+                                  onLocumSelected ??
+                                  () => Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => const LocumSigninPage(),
+                                    ),
+                                  ),
+                            ),
+                            SizedBox(height: 39 * spacing),
+                            IntroRoleButton(
+                              label: 'Clinic Owner',
+                              description: 'Clinic owner looking for Locums',
+                              color: const Color(0xFF263C80),
+                              scale: scale,
+                              onPressed:
+                                  onClinicOwnerSelected ??
+                                  () => Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          const CompanyOwnerSigninPage(),
+                                    ),
+                                  ),
+                            ),
+                            SizedBox(height: 87 * spacing),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
-  }
-
-  void _showSelection(BuildContext context, String role) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text('$role selected. Registration is coming soon.')),
-      );
   }
 }
 
