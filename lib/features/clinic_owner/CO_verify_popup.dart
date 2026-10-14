@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'CO_mainpage.dart';
@@ -28,7 +29,8 @@ class _COVerifyPopupState extends State<COVerifyPopup> {
         return;
       showDialog<void>(
         context: context,
-        barrierDismissible: false,
+        // Allow testers to continue to the homepage without completing the form.
+        barrierDismissible: kDebugMode,
         barrierColor: Colors.black.withValues(alpha: 0.12),
         builder: (_) => _VerificationDialog(
           displayName: widget.displayName,

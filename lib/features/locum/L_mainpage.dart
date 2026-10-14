@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'L_jobstatus.dart';
+import 'L_notifications.dart';
+
 enum LocumVerificationStatus { unverified, pending, verified }
 
 /// Set verified only from the account service after document review.
@@ -30,107 +33,116 @@ class _LMainPageState extends State<LMainPage> {
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF7FCFB),
     body: SafeArea(
-      child: ValueListenableBuilder<LocumVerificationStatus>(
-        valueListenable: locumVerificationStatus,
-        builder: (context, status, _) => ListView(
-          padding: const EdgeInsets.all(16),
-          children: _tab == 0
-              ? [
-                  const Text(
-                    'My Applications',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 115,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: const [
-                        _Promotion(
-                          title: 'OPTOLOCUM\nALL IN ONE.',
-                          subtitle: 'Find your next opportunity',
-                          color: Color(0xFFFFD936),
-                          icon: Icons.phone_android,
+      child: _tab == 1
+          ? const LJobStatus()
+          : _tab == 2
+          ? const LNotifications()
+          : ValueListenableBuilder<LocumVerificationStatus>(
+              valueListenable: locumVerificationStatus,
+              builder: (context, status, _) => ListView(
+                padding: const EdgeInsets.all(16),
+                children: _tab == 0
+                    ? [
+                        const Text(
+                          'My Applications',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        _Promotion(
-                          title: 'PERFECT COFFEE.\nPERFECT BREAK.',
-                          subtitle: 'Take a moment to recharge',
-                          color: Color(0xFFFFE1B9),
-                          icon: Icons.coffee,
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 115,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: const [
+                              _Promotion(
+                                title: 'OPTOLOCUM\nALL IN ONE.',
+                                subtitle: 'Find your next opportunity',
+                                color: Color(0xFFFFD936),
+                                icon: Icons.phone_android,
+                              ),
+                              _Promotion(
+                                title: 'PERFECT COFFEE.\nPERFECT BREAK.',
+                                subtitle: 'Take a moment to recharge',
+                                color: Color(0xFFFFE1B9),
+                                icon: Icons.coffee,
+                              ),
+                              _Promotion(
+                                title: 'CONNECT.\nSHARE.\nLEARN.',
+                                subtitle: 'Grow your professional network',
+                                color: Color(0xFFE4D9FA),
+                                icon: Icons.groups,
+                              ),
+                            ],
+                          ),
                         ),
-                        _Promotion(
-                          title: 'CONNECT.\nSHARE.\nLEARN.',
-                          subtitle: 'Grow your professional network',
-                          color: Color(0xFFE4D9FA),
-                          icon: Icons.groups,
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Job Recommendations',
+                                style: TextStyle(fontSize: 18),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Search jobs',
+                              onPressed: () =>
+                                  setState(() => _searching = !_searching),
+                              icon: const Icon(Icons.search),
+                            ),
+                            PopupMenuButton<String>(
+                              tooltip: 'Filter jobs',
+                              initialValue: _filter,
+                              onSelected: (value) =>
+                                  setState(() => _filter = value),
+                              itemBuilder: (_) =>
+                                  ['All jobs', 'Nearby', 'Part time']
+                                      .map(
+                                        (value) => PopupMenuItem(
+                                          value: value,
+                                          child: Text(value),
+                                        ),
+                                      )
+                                      .toList(),
+                              icon: const Icon(Icons.filter_alt),
+                            ),
+                          ],
+                        ),
+                        if (_searching)
+                          const TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Search jobs',
+                              prefixIcon: Icon(Icons.search),
+                            ),
+                          ),
+                        if (_filter != 'All jobs') Chip(label: Text(_filter)),
+                        if (status == LocumVerificationStatus.pending)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 20),
+                            child: Text(
+                              'Your account verification is pending review.',
+                            ),
+                          ),
+                      ]
+                    : [
+                        Text(
+                          _tabs[_tab],
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          _tab == 4
+                              ? 'Verification: ${status.name}'
+                              : 'No ${_tabs[_tab].toLowerCase()} yet.',
                         ),
                       ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Job Recommendations',
-                          style: TextStyle(fontSize: 18),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Search jobs',
-                        onPressed: () =>
-                            setState(() => _searching = !_searching),
-                        icon: const Icon(Icons.search),
-                      ),
-                      PopupMenuButton<String>(
-                        tooltip: 'Filter jobs',
-                        initialValue: _filter,
-                        onSelected: (value) => setState(() => _filter = value),
-                        itemBuilder: (_) => ['All jobs', 'Nearby', 'Part time']
-                            .map(
-                              (value) => PopupMenuItem(
-                                value: value,
-                                child: Text(value),
-                              ),
-                            )
-                            .toList(),
-                        icon: const Icon(Icons.filter_alt),
-                      ),
-                    ],
-                  ),
-                  if (_searching)
-                    const TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Search jobs',
-                        prefixIcon: Icon(Icons.search),
-                      ),
-                    ),
-                  if (_filter != 'All jobs') Chip(label: Text(_filter)),
-                  if (status == LocumVerificationStatus.pending)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 20),
-                      child: Text(
-                        'Your account verification is pending review.',
-                      ),
-                    ),
-                ]
-              : [
-                  Text(
-                    _tabs[_tab],
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    _tab == 4
-                        ? 'Verification: ${status.name}'
-                        : 'No ${_tabs[_tab].toLowerCase()} yet.',
-                  ),
-                ],
-        ),
-      ),
+              ),
+            ),
     ),
     bottomNavigationBar: BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
