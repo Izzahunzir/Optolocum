@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'L_mainpage.dart';
@@ -22,7 +23,8 @@ class _LVerifyPopupState extends State<LVerifyPopup> {
       }
       showDialog<void>(
         context: context,
-        barrierDismissible: false,
+        // Allow testers to continue to the homepage without completing the form.
+        barrierDismissible: kDebugMode,
         builder: (dialogContext) => Dialog(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
