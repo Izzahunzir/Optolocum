@@ -170,7 +170,8 @@ class _LNotificationsState extends State<LNotifications> {
                             onPressed: () =>
                                 setState(() => _conversation = null),
                             icon: const Icon(
-                              Icons.arrow_back,
+                              Icons.arrow_back_ios_new_rounded,
+                              size: 16,
                               color: Colors.white,
                             ),
                           ),

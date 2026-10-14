@@ -77,7 +77,7 @@ class IntroPage extends StatelessWidget {
                                 color: Colors.black,
                               ),
                             ),
-                            SizedBox(height: 212 * spacing),
+                            SizedBox(height: 196 * spacing),
                             Center(
                               child: Text(
                                 'See better careers ahead',
@@ -89,7 +89,7 @@ class IntroPage extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            SizedBox(height: 40 * spacing),
+                            SizedBox(height: 56 * spacing),
                             IntroRoleButton(
                               label: 'Locum',
                               description: 'Locum looking for vacancies',
@@ -184,7 +184,7 @@ class IntroRoleButton extends StatelessWidget {
               child: Text(label, textAlign: TextAlign.center),
             ),
           ),
-          SizedBox(height: 17 * scale),
+          SizedBox(height: 8 * scale),
           Text(
             description,
             textAlign: TextAlign.center,

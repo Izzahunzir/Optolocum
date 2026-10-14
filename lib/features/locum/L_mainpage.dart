@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/advertisement_strip.dart';
+
 import 'L_jobstatus.dart';
 import 'L_notifications.dart';
 
@@ -51,32 +53,7 @@ class _LMainPageState extends State<LMainPage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        SizedBox(
-                          height: 115,
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            children: const [
-                              _Promotion(
-                                title: 'OPTOLOCUM\nALL IN ONE.',
-                                subtitle: 'Find your next opportunity',
-                                color: Color(0xFFFFD936),
-                                icon: Icons.phone_android,
-                              ),
-                              _Promotion(
-                                title: 'PERFECT COFFEE.\nPERFECT BREAK.',
-                                subtitle: 'Take a moment to recharge',
-                                color: Color(0xFFFFE1B9),
-                                icon: Icons.coffee,
-                              ),
-                              _Promotion(
-                                title: 'CONNECT.\nSHARE.\nLEARN.',
-                                subtitle: 'Grow your professional network',
-                                color: Color(0xFFE4D9FA),
-                                icon: Icons.groups,
-                              ),
-                            ],
-                          ),
-                        ),
+                        const AdvertisementStrip(),
                         const SizedBox(height: 10),
                         Row(
                           children: [
@@ -171,50 +148,6 @@ class _LMainPageState extends State<LMainPage> {
           icon: Icon(Icons.account_circle_outlined),
           label: 'Account',
         ),
-      ],
-    ),
-  );
-}
-
-class _Promotion extends StatelessWidget {
-  const _Promotion({
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.icon,
-  });
-  final String title, subtitle;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 170,
-    margin: const EdgeInsets.only(right: 12),
-    padding: const EdgeInsets.all(10),
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const Spacer(),
-              Text(subtitle, style: const TextStyle(fontSize: 10)),
-            ],
-          ),
-        ),
-        Icon(icon, size: 40),
       ],
     ),
   );

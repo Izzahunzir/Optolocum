@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../auth/CO_header.dart';
+
 class LocumForgotPasswordPage extends StatefulWidget {
   const LocumForgotPasswordPage({super.key});
 
@@ -158,7 +160,10 @@ class _LocumForgotPasswordPageState extends State<LocumForgotPasswordPage> {
             ),
           ),
           const SafeArea(
-            child: Align(alignment: Alignment.topLeft, child: BackButton()),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: CompanyOwnerBackButton(),
+            ),
           ),
         ],
       ),
