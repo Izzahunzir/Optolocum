@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/advertisement_strip.dart';
+
 import 'CO_verification_status.dart';
 import 'CO_profile.dart';
 import 'CO_locum_activity.dart';
@@ -81,10 +83,11 @@ class _COMainPageState extends State<COMainPage> {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               suffixIcon: IconButton(
-                                tooltip: 'Clear search',
+                                tooltip: 'Close search',
                                 onPressed: () {
                                   _search.clear();
-                                  setState(() {});
+                                  FocusScope.of(context).unfocus();
+                                  setState(() => _searchOpen = false);
                                 },
                                 icon: const Icon(Icons.close, size: 18),
                               ),
@@ -130,39 +133,9 @@ class _COMainPageState extends State<COMainPage> {
                 ],
               ),
             ),
-            SizedBox(
-              height: 140 * MediaQuery.textScalerOf(context).scale(1),
-              child: ListView(
-                key: const Key('clinic-owner-ads'),
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                children: const [
-                  _AdCard(
-                    color: Color(0xFF263C80),
-                    title: 'BUY 1 FREE 1',
-                    subtitle: 'COFFEE BREAK',
-                    footer: 'A little boost for your busy day',
-                    icon: Icons.local_cafe_outlined,
-                  ),
-                  SizedBox(width: 14),
-                  _AdCard(
-                    color: Color(0xFFFFD600),
-                    title: 'FRESH PICKS',
-                    subtitle: 'FOR YOUR NEXT BREAK',
-                    footer: 'BROWSE OUR TREATS',
-                    icon: Icons.fastfood_outlined,
-                    darkText: true,
-                  ),
-                  SizedBox(width: 14),
-                  _AdCard(
-                    color: Color(0xFF237F7D),
-                    title: 'YOUR NEXT SHIFT',
-                    subtitle: 'STARTS HERE',
-                    footer: 'Discover Optolocum',
-                    icon: Icons.visibility_outlined,
-                  ),
-                ],
-              ),
+            const AdvertisementStrip(
+              key: Key('clinic-owner-ads'),
+              horizontalPadding: 12,
             ),
             Expanded(
               child: jobs.isNotEmpty
@@ -401,79 +374,6 @@ class _NavItem extends StatelessWidget {
           ),
         ),
       ),
-    ),
-  );
-}
-
-class _AdCard extends StatelessWidget {
-  const _AdCard({
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    required this.footer,
-    required this.icon,
-    this.darkText = false,
-  });
-  final Color color;
-  final String title, subtitle, footer;
-  final IconData icon;
-  final bool darkText;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 230,
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Stack(
-      children: [
-        Positioned(
-          right: -4,
-          bottom: -8,
-          child: Icon(
-            icon,
-            size: 72,
-            color: (darkText ? Colors.black : Colors.white).withValues(
-              alpha: 0.2,
-            ),
-          ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 20,
-                height: 1.05,
-                fontWeight: FontWeight.w900,
-                color: darkText ? const Color(0xFF263C80) : Colors.white,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: darkText
-                    ? const Color(0xFF263C80)
-                    : const Color(0xFFFFD778),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              footer,
-              style: TextStyle(
-                fontSize: 10,
-                color: darkText ? Colors.black : Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ],
     ),
   );
 }

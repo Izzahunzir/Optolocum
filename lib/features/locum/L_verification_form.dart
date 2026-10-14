@@ -140,7 +140,9 @@ class _LVerificationFormState extends State<LVerificationForm> {
         'Account Verification',
         style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
       ),
-      leading: BackButton(
+      leading: IconButton(
+        tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
         onPressed: () {
           if (_uploadStep) {
             setState(() => _uploadStep = false);

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../auth/CO_header.dart';
+
 import 'L_forgotpass.dart';
 import '../locum/L_verify_popup.dart';
 
@@ -336,7 +338,7 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
           SafeArea(
             child: Align(
               alignment: Alignment.topLeft,
-              child: const BackButton(),
+              child: const CompanyOwnerBackButton(),
             ),
           ),
         ],
