@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../intro/intro_page.dart';
+import '../../widgets/logout_dialog.dart';
 import 'CO_contact_us.dart';
 import 'CO_navigation.dart';
 import 'CO_verification_status.dart';
@@ -64,49 +65,7 @@ class COProfile extends StatelessWidget {
   );
 
   Future<void> _logout(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'Are you sure you want to sign out?',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const Divider(height: 1),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(dialogContext, false),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.black,
-                      ),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(dialogContext, true),
-                      style: TextButton.styleFrom(foregroundColor: Colors.red),
-                      child: const Text('Log Out'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    final confirmed = await showLogoutDialog(context);
     if (confirmed != true || !context.mounted) return;
     coVerificationStatus.value = COVerificationStatus.unverified;
     coJobPostings.value = const [];

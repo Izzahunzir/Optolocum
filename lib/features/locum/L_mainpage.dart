@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../widgets/advertisement_strip.dart';
+import '../../widgets/logout_dialog.dart';
+import '../intro/intro_page.dart';
 
 import 'L_jobstatus.dart';
 import 'L_notifications.dart';
@@ -31,6 +33,15 @@ class _LMainPageState extends State<LMainPage> {
     'Account',
   ];
 
+  Future<void> _logout() async {
+    final confirmed = await showLogoutDialog(context);
+    if (confirmed != true || !mounted) return;
+    locumVerificationStatus.value = LocumVerificationStatus.unverified;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const IntroPage()),
+      (_) => false,
+    );
+  }
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF7FCFB),
@@ -111,7 +122,12 @@ class _LMainPageState extends State<LMainPage> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        if (_tab == 4)
+                          ListTile(
+                            leading: const Icon(Icons.logout),
+                            title: const Text('Logout'),
+                            onTap: _logout,
+                          ),                        const SizedBox(height: 24),
                         Text(
                           _tab == 4
                               ? 'Verification: ${status.name}'
