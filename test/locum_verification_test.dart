@@ -39,6 +39,8 @@ void main() {
     expect(find.text('Complete Your Profile'), findsNothing);
     await tester.tap(find.text('Account'));
     await tester.pumpAndSettle();
-    expect(find.text('Verification: verified'), findsOneWidget);
+    expect(find.text('Current\nShift Hours'), findsOneWidget);
+    expect(find.text('48 hours'), findsOneWidget);
+    expect(find.text('Account Verification'), findsOneWidget);
   });
 }
