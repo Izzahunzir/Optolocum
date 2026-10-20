@@ -6,6 +6,10 @@ import '../intro/intro_page.dart';
 
 import 'L_jobstatus.dart';
 import 'L_notifications.dart';
+import 'L_profile.dart';
+import 'L_contactUs.dart';
+import 'L_savedJob.dart';
+import 'L_profile_data.dart';
 
 enum LocumVerificationStatus { unverified, pending, verified }
 
@@ -23,25 +27,35 @@ class LMainPage extends StatefulWidget {
 
 class _LMainPageState extends State<LMainPage> {
   int _tab = 0;
+  bool _showContactUs = false;
+  bool _showSavedJobs = false;
   bool _searching = false;
   String _filter = 'All jobs';
   static const _tabs = [
     'Home',
     'Job Status',
     'Notifications',
-    'Payments',
+    'Payment History',
     'Account',
   ];
+
+  void _closeAccountPage() => setState(() {
+    _showContactUs = false;
+    _showSavedJobs = false;
+  });
 
   Future<void> _logout() async {
     final confirmed = await showLogoutDialog(context);
     if (confirmed != true || !mounted) return;
     locumVerificationStatus.value = LocumVerificationStatus.unverified;
+    locumSavedJobs.clear();
+    locumProfileData.value = null;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const IntroPage()),
       (_) => false,
     );
   }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF7FCFB),
@@ -50,6 +64,22 @@ class _LMainPageState extends State<LMainPage> {
           ? const LJobStatus()
           : _tab == 2
           ? const LNotifications()
+          : _tab == 4
+          ? _showContactUs || _showSavedJobs
+                ? PopScope(
+                    canPop: false,
+                    onPopInvokedWithResult: (didPop, result) {
+                      if (!didPop) _closeAccountPage();
+                    },
+                    child: _showSavedJobs
+                        ? LSavedJob(onBack: _closeAccountPage)
+                        : LContactUs(onBack: _closeAccountPage),
+                  )
+                : LProfile(
+                    onLogout: _logout,
+                    onContactUs: () => setState(() => _showContactUs = true),
+                    onSavedJobs: () => setState(() => _showSavedJobs = true),
+                  )
           : ValueListenableBuilder<LocumVerificationStatus>(
               valueListenable: locumVerificationStatus,
               builder: (context, status, _) => ListView(
@@ -122,17 +152,8 @@ class _LMainPageState extends State<LMainPage> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        if (_tab == 4)
-                          ListTile(
-                            leading: const Icon(Icons.logout),
-                            title: const Text('Logout'),
-                            onTap: _logout,
-                          ),                        const SizedBox(height: 24),
-                        Text(
-                          _tab == 4
-                              ? 'Verification: ${status.name}'
-                              : 'No ${_tabs[_tab].toLowerCase()} yet.',
-                        ),
+                        const SizedBox(height: 24),
+                        Text('Track your earnings and payments updates'),
                       ],
               ),
             ),
@@ -145,7 +166,11 @@ class _LMainPageState extends State<LMainPage> {
       selectedFontSize: 10,
       unselectedFontSize: 10,
       currentIndex: _tab,
-      onTap: (index) => setState(() => _tab = index),
+      onTap: (index) => setState(() {
+        _tab = index;
+        _showContactUs = false;
+        _showSavedJobs = false;
+      }),
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Home'),
         BottomNavigationBarItem(
