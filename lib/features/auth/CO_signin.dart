@@ -1,3 +1,5 @@
+import 'package:optolocum/services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'CO_header.dart';
@@ -15,12 +17,40 @@ class CompanyOwnerSigninPage extends StatefulWidget {
 class _CompanyOwnerSigninPageState extends State<CompanyOwnerSigninPage> {
   static const _blue = Color(0xFF263C80);
   final _formKey = GlobalKey<FormState>();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  bool _isSubmitting = false;
 
-  void _login() {
-    if (!_formKey.currentState!.validate()) return;
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (_isSubmitting || !_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
-    Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => const COVerifyPopup()));
+    setState(() => _isSubmitting = true);
+    try {
+      await AuthService().signIn(
+        email: emailController.text,
+        password: passwordController.text,
+      );
+      if (!mounted) return;
+      Navigator.of(context)
+          .push(MaterialPageRoute<void>(builder: (_) => const COVerifyPopup()));
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Login failed: ${e.code}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message ?? 'Authentication failed: ${e.code}'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   InputDecoration _decoration(String hint) => InputDecoration(
@@ -110,6 +140,7 @@ class _CompanyOwnerSigninPageState extends State<CompanyOwnerSigninPage> {
                                 ),
                                 const SizedBox(height: 5),
                                 TextFormField(
+                                  controller: emailController,
                                   decoration: _decoration('ali@gmail.com'),
                                   keyboardType: TextInputType.emailAddress,
                                   autofillHints: const [AutofillHints.username],
@@ -129,6 +160,7 @@ class _CompanyOwnerSigninPageState extends State<CompanyOwnerSigninPage> {
                                 ),
                                 const SizedBox(height: 5),
                                 TextFormField(
+                                  controller: passwordController,
                                   decoration: _decoration(''),
                                   obscureText: true,
                                   autocorrect: false,
@@ -164,7 +196,7 @@ class _CompanyOwnerSigninPageState extends State<CompanyOwnerSigninPage> {
                                 ),
                                 const SizedBox(height: 8),
                                 ElevatedButton(
-                                  onPressed: _login,
+                                  onPressed: _isSubmitting ? null : _login,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _blue,
                                     foregroundColor: Colors.white,
