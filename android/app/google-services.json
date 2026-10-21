@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "261614710339",
+    "project_id": "optolocum-f314e",
+    "storage_bucket": "optolocum-f314e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:261614710339:android:1f5d7c692d782dd4986ef6",
+        "android_client_info": {
+          "package_name": "com.example.optolocum"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC8t9g7DtvPHgolHcd06tpmX3q5DAk8ass"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

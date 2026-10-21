@@ -531,13 +531,15 @@ class _PostingFormState extends State<_PostingForm> {
         if ((value ?? '').trim().isEmpty) return 'Required';
         if (name == 'Pay Rate') {
           final amount = double.tryParse(value!.trim());
-          if (amount == null || !amount.isFinite || amount <= 0)
+          if (amount == null || !amount.isFinite || amount <= 0) {
             return 'Enter a positive rate';
+          }
         }
         if (name == 'Contact Number' &&
             !RegExp(r'^\+?[0-9]{7,15}$')
-                .hasMatch(value!.replaceAll(RegExp(r'[\s()-]'), '')))
+                .hasMatch(value!.replaceAll(RegExp(r'[\s()-]'), ''))) {
           return 'Enter a valid number';
+        }
         return null;
       },
     ),
@@ -561,12 +563,13 @@ class _PostingFormState extends State<_PostingForm> {
       firstDate: now,
       lastDate: DateTime(now.year + 5),
     );
-    if (selected != null && mounted)
+    if (selected != null && mounted) {
       setState(() {
         _date = selected;
         _dateText.text = MaterialLocalizations.of(context)
             .formatMediumDate(selected);
       });
+    }
   }
 
   Future<void> pickTime(bool start) async {
@@ -575,7 +578,7 @@ class _PostingFormState extends State<_PostingForm> {
       initialTime:
           (start ? _start : _end) ?? const TimeOfDay(hour: 9, minute: 0),
     );
-    if (selected != null && mounted)
+    if (selected != null && mounted) {
       setState(() {
         if (start) {
           _start = selected;
@@ -585,6 +588,7 @@ class _PostingFormState extends State<_PostingForm> {
           _endText.text = selected.format(context);
         }
       });
+    }
   }
 
   void submit() {
@@ -689,8 +693,9 @@ class _PostingFormState extends State<_PostingForm> {
                           if (_end == null) return 'Select end time';
                           if (_start != null &&
                               _end!.hour * 60 + _end!.minute <=
-                                  _start!.hour * 60 + _start!.minute)
+                                  _start!.hour * 60 + _start!.minute) {
                             return 'Must be after start';
+                          }
                           return null;
                         },
                       ),

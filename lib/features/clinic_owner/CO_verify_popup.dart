@@ -25,8 +25,9 @@ class _COVerifyPopupState extends State<COVerifyPopup> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
-          coVerificationStatus.value == COVerificationStatus.verified)
+          coVerificationStatus.value == COVerificationStatus.verified) {
         return;
+      }
       showDialog<void>(
         context: context,
         // Allow testers to continue to the homepage without completing the form.

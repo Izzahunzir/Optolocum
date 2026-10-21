@@ -302,8 +302,9 @@ class _COMainPageState extends State<COMainPage> {
           ].any((value) => value.toLowerCase().contains(query)),
         )
         .toList();
-    if (results.isEmpty)
+    if (results.isEmpty) {
       return const Center(child: Text('No matching job posts'));
+    }
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 24, 18, 18),
       children: [
