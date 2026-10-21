@@ -1,3 +1,5 @@
+import 'package:optolocum/services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'CO_header.dart';
@@ -12,17 +14,43 @@ class CompanyOwnerSignupPage extends StatefulWidget {
 class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
   static const _blue = Color(0xFF263C80);
   final _formKey = GlobalKey<FormState>();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  bool _isSubmitting = false;
 
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting || !_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Your details are ready. Account registration is coming soon.',
+    setState(() => _isSubmitting = true);
+    try {
+      await AuthService().signUp(
+        email: emailController.text,
+        password: passwordController.text,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account created successfully. You can now log in.'),
         ),
-      ),
-    );
+      );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Signup failed: ${e.code}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message ?? 'Authentication failed: ${e.code}'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   InputDecoration _decoration(String hint) => InputDecoration(
@@ -50,6 +78,7 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
     required String label,
     required String hint,
     required String? Function(String?) validator,
+    TextEditingController? controller,
     TextInputType? keyboardType,
     Iterable<String>? autofillHints,
     bool obscureText = false,
@@ -61,6 +90,7 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
         Text(label, style: const TextStyle(fontSize: 13)),
         const SizedBox(height: 5),
         TextFormField(
+          controller: controller,
           decoration: _decoration(hint),
           keyboardType: keyboardType,
           autofillHints: autofillHints,
@@ -155,6 +185,7 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
                                   ),
                                   _field(
                                     label: 'Email Address',
+                                    controller: emailController,
                                     hint: 'ali@gmail.com',
                                     keyboardType: TextInputType.emailAddress,
                                     autofillHints: const [AutofillHints.email],
@@ -183,6 +214,7 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
                                   ),
                                   _field(
                                     label: 'Password',
+                                    controller: passwordController,
                                     hint: 'Enter your password',
                                     obscureText: true,
                                     autofillHints: const [
@@ -227,7 +259,7 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
                                   ),
                                   const SizedBox(height: 32),
                                   ElevatedButton(
-                                    onPressed: _submit,
+                                    onPressed: _isSubmitting ? null : _submit,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _blue,
                                       foregroundColor: Colors.white,

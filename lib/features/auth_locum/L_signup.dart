@@ -1,3 +1,5 @@
+import 'package:optolocum/services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../auth/CO_header.dart';
@@ -15,17 +17,46 @@ class LocumSignupPage extends StatefulWidget {
 class _LocumSignupPageState extends State<LocumSignupPage> {
   static const _teal = Color(0xFF237F7D);
   final _formKey = GlobalKey<FormState>();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
   String _fullName = '';
 
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _submit() async {
+    if (_isSubmitting || !_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
-    _formKey.currentState!.save();
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => LVerifyPopup(displayName: _fullName),
-      ),
-    );
+    setState(() => _isSubmitting = true);
+    try {
+      await AuthService().signUp(
+        email: emailController.text,
+        password: passwordController.text,
+      );
+      if (!mounted) return;
+      _formKey.currentState!.save();
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => LVerifyPopup(displayName: _fullName),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Signup failed: ${e.code}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message ?? 'Authentication failed: ${e.code}'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   InputDecoration _decoration(String hint) => InputDecoration(
@@ -53,6 +84,7 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
     required String label,
     required String hint,
     required String? Function(String?) validator,
+    TextEditingController? controller,
     TextInputType? keyboardType,
     Iterable<String>? autofillHints,
     bool obscureText = false,
@@ -64,6 +96,7 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
         Text(label, style: const TextStyle(fontSize: 13)),
         const SizedBox(height: 5),
         TextFormField(
+          controller: controller,
           decoration: _decoration(hint),
           keyboardType: keyboardType,
           autofillHints: autofillHints,
@@ -178,6 +211,7 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
                                   ),
                                   _field(
                                     label: 'Email Address',
+                                    controller: emailController,
                                     hint: 'sarahzulkaedah@gmail.com',
                                     keyboardType: TextInputType.emailAddress,
                                     autofillHints: const [AutofillHints.email],
@@ -189,6 +223,7 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
                                   ),
                                   _field(
                                     label: 'Password',
+                                    controller: passwordController,
                                     hint: 'Enter your password',
                                     obscureText: true,
                                     autofillHints: const [
@@ -287,7 +322,7 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
                                   ),
                                   const SizedBox(height: 24),
                                   ElevatedButton(
-                                    onPressed: _submit,
+                                    onPressed: _isSubmitting ? null : _submit,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _teal,
                                       foregroundColor: Colors.white,
