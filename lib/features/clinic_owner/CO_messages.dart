@@ -43,12 +43,13 @@ class _COMessagesState extends State<COMessages> {
       await widget.onSendMessage!(widget.conversation.id, text);
       if (mounted && _input.text.trim() == text) _input.clear();
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Message could not be sent. Please try again.'),
           ),
         );
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }
