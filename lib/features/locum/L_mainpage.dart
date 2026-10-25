@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:optolocum/services/job_service.dart';
 
 import '../../widgets/advertisement_strip.dart';
 import '../../widgets/logout_dialog.dart';
 import '../intro/intro_page.dart';
 
 import 'L_jobstatus.dart';
+import 'L_jobDetails.dart';
+import 'L_applyJobDialog.dart';
 import 'L_notifications.dart';
 import 'L_profile.dart';
 import 'L_contactUs.dart';
@@ -136,6 +140,30 @@ class _LMainPageState extends State<LMainPage> {
                             ),
                           ),
                         if (_filter != 'All jobs') Chip(label: Text(_filter)),
+                        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                          stream: JobService().getAvailableJobs(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              return Text(
+                                'Failed to load jobs: ${snapshot.error}',
+                              );
+                            }
+                            if (!snapshot.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            final jobs = snapshot.data!.docs;
+                            return Column(
+                              children: jobs.map((doc) {
+                                return LocumJobCard(
+                                  jobId: doc.id,
+                                  job: doc.data(),
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
                         if (status == LocumVerificationStatus.pending)
                           const Padding(
                             padding: EdgeInsets.only(top: 20),
@@ -192,4 +220,187 @@ class _LMainPageState extends State<LMainPage> {
       ],
     ),
   );
+}
+
+class LocumJobCard extends StatelessWidget {
+  final String jobId;
+  final Map<String, dynamic> job;
+
+  const LocumJobCard({super.key, required this.jobId, required this.job});
+
+  @override
+  Widget build(BuildContext context) {
+    final rawDate = job['jobDate'];
+    final date = rawDate is Timestamp ? rawDate.toDate() : null;
+    final formattedDate = date == null
+        ? 'Date not available'
+        : '${date.day}/${date.month}/${date.year}';
+    final startTime = job['startTime'] ?? '-';
+    final endTime = job['endTime'] ?? '-';
+    final payUnit = job['payRateUnit'] == 'per_hour'
+        ? '/hour'
+        : job['payRateUnit'] == 'per_day'
+        ? '/day'
+        : '/shift';
+
+    const iconColor = Color(0xFF17213D);
+    const greenColor = Color(0xFF248783);
+
+    Widget infoRow(IconData icon, String text) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: iconColor, size: 23),
+            const SizedBox(width: 12),
+            Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDF6F4),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  job['role'] ?? 'Optometrist',
+                  style: const TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () {
+                  // TODO: Connect Saved Jobs functionality
+                },
+                icon: const Icon(
+                  Icons.bookmark_border,
+                  size: 30,
+                  color: iconColor,
+                ),
+              ),
+            ],
+          ),
+          infoRow(Icons.store, job['placeName'] ?? 'Unknown Clinic'),
+          infoRow(
+            Icons.location_on_outlined,
+            job['location'] ?? 'Location not available',
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.calendar_month_outlined,
+                  color: iconColor,
+                  size: 23,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    formattedDate,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Icon(Icons.access_time, color: iconColor, size: 23),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '$startTime - $endTime',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          infoRow(
+            Icons.account_balance_wallet_outlined,
+            'RM ${job['payRate'] ?? 0}$payUnit',
+          ),
+          const SizedBox(height: 8),
+          infoRow(
+            Icons.person_outline,
+            job['contactPerson'] ?? 'Contact person unavailable',
+          ),
+          infoRow(
+            Icons.phone_outlined,
+            job['contactNumber'] ?? 'Contact unavailable',
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            LJobDetails(jobId: jobId, job: job),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'View Details',
+                    style: TextStyle(
+                      color: greenColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    showApplyJobDialog(
+                      context: context,
+                      jobId: jobId,
+                      jobTitle: job['role'] ?? 'Optometrist',
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: greenColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Apply Now',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

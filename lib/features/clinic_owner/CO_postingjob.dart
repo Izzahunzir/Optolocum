@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:optolocum/services/job_service.dart';
 
 import 'dart:async';
 
@@ -39,6 +41,40 @@ class COJobPosting {
 
 final coJobPostings = ValueNotifier<List<COJobPosting>>(const []);
 
+COJobPosting jobFromFirestore(Map<String, dynamic> data) {
+  TimeOfDay parseTime(String value) {
+    final parts = value.split(':');
+    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+  }
+
+  String formatPayUnit(String value) {
+    switch (value) {
+      case 'per_hour':
+        return 'Per hour';
+      case 'per_day':
+        return 'Per day';
+      case 'per_shift':
+        return 'Per shift';
+      default:
+        return value;
+    }
+  }
+
+  return COJobPosting(
+    placeName: data['placeName'] as String,
+    location: data['location'] as String,
+    role: data['role'] as String,
+    date: (data['jobDate'] as Timestamp).toDate(),
+    start: parseTime(data['startTime'] as String),
+    end: parseTime(data['endTime'] as String),
+    pay: (data['payRate'] as num).toDouble(),
+    payUnit: formatPayUnit(data['payRateUnit'] as String),
+    description: data['jobDescription'] as String,
+    contactPerson: data['contactPerson'] as String,
+    contactNumber: data['contactNumber'] as String,
+  );
+}
+
 class COPostingJob extends StatefulWidget {
   const COPostingJob({super.key});
 
@@ -62,13 +98,54 @@ class _COPostingJobState extends State<COPostingJob> {
       barrierDismissible: false,
       builder: (_) => const _PostingForm(),
     );
-    if (posting == null || !context.mounted) return;
-    coJobPostings.value = List.unmodifiable([...coJobPostings.value, posting]);
-    setState(() => _justPosted = true);
-    _successTimer?.cancel();
-    _successTimer = Timer(const Duration(milliseconds: 800), () {
-      if (mounted) setState(() => _justPosted = false);
-    });
+
+    if (posting == null || !mounted) return;
+
+    try {
+      final service = JobService();
+
+      String formatTime(TimeOfDay time) {
+        return '${time.hour.toString().padLeft(2, '0')}:'
+            '${time.minute.toString().padLeft(2, '0')}';
+      }
+
+      await service.createJob(
+        placeName: posting.placeName,
+        location: posting.location,
+        role: posting.role,
+        jobDate: posting.date,
+        startTime: formatTime(posting.start),
+        endTime: formatTime(posting.end),
+        payRate: posting.pay,
+        payRateUnit: posting.payUnit.toLowerCase().replaceAll(' ', '_'),
+        jobDescription: posting.description,
+        contactPerson: posting.contactPerson,
+        contactNumber: posting.contactNumber,
+      );
+
+      if (!mounted) return;
+
+      coJobPostings.value = List.unmodifiable([
+        ...coJobPostings.value,
+        posting,
+      ]);
+
+      setState(() => _justPosted = true);
+
+      _successTimer?.cancel();
+      _successTimer = Timer(const Duration(milliseconds: 800), () {
+        if (mounted) setState(() => _justPosted = false);
+      });
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to post job: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -84,171 +161,188 @@ class _COPostingJobState extends State<COPostingJob> {
       backgroundColor: const Color(0xFF3B4E92),
       foregroundColor: Colors.white,
     ),
-    body: ValueListenableBuilder<List<COJobPosting>>(
-      valueListenable: coJobPostings,
-      builder: (context, jobs, _) => LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          padding: const EdgeInsets.all(22),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: 640,
-                minHeight: (constraints.maxHeight - 44).clamp(
-                  0,
-                  double.infinity,
+    body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: JobService().getMyJobs(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('Failed to load jobs: ${snapshot.error}'));
+        }
+
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final jobs = snapshot.data!.docs
+            .map((doc) => jobFromFirestore(doc.data()))
+            .toList();
+
+        return LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.all(22),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 640,
+                  minHeight: (constraints.maxHeight - 44).clamp(
+                    0,
+                    double.infinity,
+                  ),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_justPosted)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 9,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDEFFDE),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.check,
-                              color: Color(0xFF239D32),
-                              size: 20,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'Job Added Successfully!',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF237F3A),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_justPosted)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 9,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDEFFDE),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.check,
+                                color: Color(0xFF239D32),
+                                size: 20,
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  const Text(
-                    'My Jobs Postings',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Manage your locum job postings',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 20),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Card(
-                      color: Colors.white,
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.description,
-                                  color: Color(0xFF9B89ED),
+                              SizedBox(width: 8),
+                              Text(
+                                'Job Added Successfully!',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF237F3A),
                                 ),
-                                const SizedBox(width: 14),
-                                Text(
-                                  '${jobs.length}',
-                                  style: const TextStyle(fontSize: 20),
-                                ),
-                              ],
-                            ),
-                            const Text(
-                              'Active Postings',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  if (jobs.isEmpty) ...[
-                    const SizedBox(height: 64),
-                    const Center(
-                      child: SizedBox(
-                        width: 112,
-                        height: 112,
-                        child: Stack(
-                          children: [
-                            Icon(
-                              Icons.description_rounded,
-                              size: 106,
-                              color: Color(0xFF9B89ED),
-                            ),
-                            Positioned(
-                              right: 0,
-                              bottom: 4,
-                              child: Icon(
-                                Icons.search,
-                                size: 46,
-                                color: Color(0xFF263C80),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
                     const Text(
-                      'You haven’t posted any locum jobs yet',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Find qualified optometrists and staff by\ncreating your first job posting',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    const SizedBox(height: 40),
-                  ] else ...[
-                    const SizedBox(height: 22),
-                    const Text(
-                      'Active Postings',
+                      'My Jobs Postings',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    ...jobs.map((job) => COPostedJobCard(job: job)),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Manage your locum job postings',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 20),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Card(
+                        color: Colors.white,
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.description,
+                                    color: Color(0xFF9B89ED),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Text(
+                                    '${jobs.length}',
+                                    style: const TextStyle(fontSize: 20),
+                                  ),
+                                ],
+                              ),
+                              const Text(
+                                'Active Postings',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (jobs.isEmpty) ...[
+                      const SizedBox(height: 64),
+                      const Center(
+                        child: SizedBox(
+                          width: 112,
+                          height: 112,
+                          child: Stack(
+                            children: [
+                              Icon(
+                                Icons.description_rounded,
+                                size: 106,
+                                color: Color(0xFF9B89ED),
+                              ),
+                              Positioned(
+                                right: 0,
+                                bottom: 4,
+                                child: Icon(
+                                  Icons.search,
+                                  size: 46,
+                                  color: Color(0xFF263C80),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      const Text(
+                        'You haven’t posted any locum jobs yet',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Find qualified optometrists and staff by\ncreating your first job posting',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                      const SizedBox(height: 40),
+                    ] else ...[
+                      const SizedBox(height: 22),
+                      const Text(
+                        'Active Postings',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      ...jobs.map((job) => COPostedJobCard(job: job)),
+                      const SizedBox(height: 20),
+                    ],
+                    Center(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _create(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF263C80),
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Create Job Posting'),
+                      ),
+                    ),
                     const SizedBox(height: 20),
                   ],
-                  Center(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _create(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF263C80),
-                        foregroundColor: Colors.white,
-                      ),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Create Job Posting'),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     ),
     bottomNavigationBar: CONavigation(
       postingSelected: true,
