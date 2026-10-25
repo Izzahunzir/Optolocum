@@ -1,0 +1,32 @@
+// ADD inside match /databases/{database}/documents { ... }
+// Keep ALL existing rules. This is NOT a replacement rules file.
+match /application_applicant_summaries/{applicationId} {
+  function ownsApplicationJob() {
+    let application = get(
+      /databases/$(database)/documents/applications/$(applicationId)
+    ).data;
+    return application.clinicOwnerId == request.auth.uid
+      && application.locumId is string
+      && application.jobId is string
+      && application.locumId != request.auth.uid
+      && applicationId == application.jobId + '_' + application.locumId
+      && get(
+        /databases/$(database)/documents/job_postings/$(application.jobId)
+      ).data.clinicOwnerId == request.auth.uid;
+  }
+
+  // Permit listening before the asynchronous summary has been created.
+  // Deny reads if unexpected fields or types ever appear in a summary.
+  allow get: if request.auth != null
+    && ownsApplicationJob()
+    && (resource == null || (
+      resource.data.keys().hasAll(['fullName', 'highestEducation', 'course'])
+      && resource.data.keys().hasOnly(['fullName', 'highestEducation', 'course'])
+      && resource.data.fullName is string
+      && resource.data.highestEducation is string
+      && resource.data.course is string
+    ));
+
+  // Only the trusted backend publishes summaries. Clients cannot enumerate.
+  allow list, create, update, delete: if false;
+}

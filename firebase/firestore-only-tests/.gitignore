@@ -1,0 +1,5 @@
+node_modules/
+.emulator-cache/
+*-debug.log
+*-debug.*.log
+test-results*.log

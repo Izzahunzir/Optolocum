@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:optolocum/services/job_service.dart';
 
 import '../../widgets/advertisement_strip.dart';
 
 import 'CO_verification_status.dart';
+
 import 'CO_profile.dart';
 import 'CO_locum_activity.dart';
 import 'CO_notifications.dart';
@@ -39,20 +42,44 @@ class _COMainPageState extends State<COMainPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<COVerificationStatus>(
-      valueListenable: coVerificationStatus,
-      builder: (context, status, _) =>
-          ValueListenableBuilder<List<COJobPosting>>(
-            valueListenable: coJobPostings,
-            builder: (context, jobs, _) => _buildPage(
-              context,
-              widget.isVerified ?? status == COVerificationStatus.verified,
-              jobs,
-            ),
-          ),
-    );
-  }
+Widget build(BuildContext context) {
+  return ValueListenableBuilder<COVerificationStatus>(
+    valueListenable: coVerificationStatus,
+    builder: (context, status, _) {
+      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: JobService().getMyJobs(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Scaffold(
+              body: Center(
+                child: Text('Failed to load jobs: ${snapshot.error}'),
+              ),
+            );
+          }
+
+          if (!snapshot.hasData) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
+          final jobs = snapshot.data!.docs
+              .map((doc) => jobFromFirestore(doc.data(), jobId: doc.id))
+              .toList();
+
+          return _buildPage(
+            context,
+            widget.isVerified ??
+                status == COVerificationStatus.verified,
+            jobs,
+          );
+        },
+      );
+    },
+  );
+}
 
   Widget _buildPage(
     BuildContext context,

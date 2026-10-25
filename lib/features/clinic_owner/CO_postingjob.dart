@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:optolocum/services/job_service.dart';
 
 import 'dart:async';
@@ -11,6 +12,7 @@ import 'CO_profile.dart';
 /// Session-only posting data. Replace with account-scoped persistence later.
 class COJobPosting {
   const COJobPosting({
+    this.jobId,
     required this.placeName,
     required this.location,
     required this.role,
@@ -36,12 +38,16 @@ class COJobPosting {
   final TimeOfDay start, end;
   final double pay;
   final String? imageUrl;
+  final String? jobId;
   final int applicantCount;
 }
 
 final coJobPostings = ValueNotifier<List<COJobPosting>>(const []);
 
-COJobPosting jobFromFirestore(Map<String, dynamic> data) {
+COJobPosting jobFromFirestore(
+  Map<String, dynamic> data, {
+  String? jobId,
+}) {
   TimeOfDay parseTime(String value) {
     final parts = value.split(':');
     return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
@@ -61,6 +67,7 @@ COJobPosting jobFromFirestore(Map<String, dynamic> data) {
   }
 
   return COJobPosting(
+    jobId: jobId,
     placeName: data['placeName'] as String,
     location: data['location'] as String,
     role: data['role'] as String,
@@ -173,7 +180,7 @@ class _COPostingJobState extends State<COPostingJob> {
         }
 
         final jobs = snapshot.data!.docs
-            .map((doc) => jobFromFirestore(doc.data()))
+            .map((doc) => jobFromFirestore(doc.data(), jobId: doc.id))
             .toList();
 
         return LayoutBuilder(
@@ -404,23 +411,39 @@ class COPostedJobCard extends StatelessWidget {
     final duration = hours == hours.roundToDouble()
         ? hours.toInt().toString()
         : hours.toStringAsFixed(1);
-    final badge = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF263C80),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.groups_outlined, size: 25, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(
-            '${job.applicantCount} locum applied',
-            style: const TextStyle(fontSize: 12, color: Colors.white),
+    final badge = StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: job.jobId == null
+          ? const Stream.empty()
+          : FirebaseFirestore.instance
+              .collection('applications')
+              .where('jobId', isEqualTo: job.jobId)
+              .where(
+                'clinicOwnerId',
+                isEqualTo: FirebaseAuth.instance.currentUser!.uid,
+              )
+              .snapshots(),
+      builder: (context, snapshot) {
+        final count = snapshot.data?.docs.length ?? 0;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF263C80),
+            borderRadius: BorderRadius.circular(6),
           ),
-        ],
-      ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.groups_outlined, size: 25, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                '$count locum applied',
+                style: const TextStyle(fontSize: 12, color: Colors.white),
+              ),
+            ],
+          ),
+        );
+      },
     );
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
