@@ -1,0 +1,132 @@
+// Complete local test fixture: rules supplied by the user, plus the approved
+// Firestore-only applicant-summary rules. Not deployed to production.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /job_postings/{jobId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.clinicOwnerId == request.auth.uid
+        && request.resource.data.status == 'available';
+      allow update, delete: if request.auth != null
+        && resource.data.clinicOwnerId == request.auth.uid
+        && request.resource.data.clinicOwnerId == resource.data.clinicOwnerId;
+    }
+
+    match /applications/{applicationId} {
+      allow create: if request.auth != null
+        && request.resource.data.locumId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly([
+          'jobId', 'locumId', 'clinicOwnerId', 'status', 'appliedAt'
+        ])
+        && request.resource.data.jobId is string
+        && request.resource.data.clinicOwnerId is string
+        && applicationId == request.resource.data.jobId + '_' + request.auth.uid
+        && exists(
+          /databases/$(database)/documents/job_postings/$(request.resource.data.jobId)
+        )
+        && get(
+          /databases/$(database)/documents/job_postings/$(request.resource.data.jobId)
+        ).data.status == 'available'
+        && get(
+          /databases/$(database)/documents/job_postings/$(request.resource.data.jobId)
+        ).data.clinicOwnerId == request.resource.data.clinicOwnerId
+        && request.resource.data.clinicOwnerId != request.auth.uid
+        && request.resource.data.appliedAt == request.time;
+
+      allow get: if request.auth != null
+        && (
+          applicationId.matches('.*_' + request.auth.uid)
+          || (resource != null && resource.data.clinicOwnerId == request.auth.uid)
+        );
+      allow list: if request.auth != null
+        && (resource.data.locumId == request.auth.uid
+          || resource.data.clinicOwnerId == request.auth.uid);
+      allow update, delete: if false;
+    }
+
+    match /locum_profiles/{locumId} {
+      allow get: if request.auth != null && request.auth.uid == locumId;
+      allow list: if false;
+      allow create, update: if request.auth != null
+        && request.auth.uid == locumId
+        && request.resource.data.verificationStatus == 'pending';
+      allow delete: if false;
+    }
+
+    match /application_applicant_summaries/{applicationId} {
+      function applicationDocument() {
+        return get(
+          /databases/$(database)/documents/applications/$(applicationId)
+        );
+      }
+
+      function jobBelongsToOwner(jobId, ownerId) {
+        let job = get(
+          /databases/$(database)/documents/job_postings/$(jobId)
+        );
+        return job != null
+          && job.data.get('clinicOwnerId', '') == ownerId;
+      }
+
+      function validRelationship(app) {
+        return app.keys().hasAll(['jobId', 'locumId', 'clinicOwnerId'])
+          && app.jobId is string
+          && app.jobId.matches('^[^/]+$')
+          && app.locumId is string
+          && app.locumId.matches('^[^/]+$')
+          && app.clinicOwnerId is string
+          && app.clinicOwnerId.size() > 0
+          && applicationId == app.jobId + '_' + app.locumId
+          && app.locumId != app.clinicOwnerId
+          && jobBelongsToOwner(app.jobId, app.clinicOwnerId);
+      }
+
+      function validSummary(data) {
+        return data.keys().hasAll(['fullName', 'highestEducation', 'course'])
+          && data.keys().hasOnly(['fullName', 'highestEducation', 'course'])
+          && data.fullName is string
+          && data.highestEducation is string
+          && data.course is string;
+      }
+
+      function profileText(profile, key) {
+        return profile.get(key, '') is string ? profile.get(key, '') : '';
+      }
+
+      function matchesOwnProfile() {
+        let profile = get(
+          /databases/$(database)/documents/locum_profiles/$(request.auth.uid)
+        );
+        return profile != null
+          && request.resource.data.fullName == profileText(profile.data, 'fullName')
+          && request.resource.data.highestEducation == profileText(profile.data, 'highestEducation')
+          && request.resource.data.course == profileText(profile.data, 'course');
+      }
+
+      function canPublishOwnSummary() {
+        let app = applicationDocument();
+        return app != null
+          && validRelationship(app.data)
+          && app.data.locumId == request.auth.uid
+          && validSummary(request.resource.data)
+          && matchesOwnProfile();
+      }
+
+      function canReadApplicantSummary() {
+        let app = applicationDocument();
+        return app != null
+          && validRelationship(app.data)
+          && app.data.clinicOwnerId == request.auth.uid;
+      }
+
+      allow get: if request.auth != null
+        && canReadApplicantSummary()
+        && (resource == null || validSummary(resource.data));
+      allow create, update: if request.auth != null && canPublishOwnSummary();
+      allow list, delete: if false;
+    }
+  }
+}

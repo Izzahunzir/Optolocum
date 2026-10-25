@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../services/application_service.dart';
 
 import 'CO_mainpage.dart';
 import 'CO_navigation.dart';
@@ -20,6 +24,8 @@ class COLocumApplication {
     required this.location,
     required this.position,
     this.timestamp = '',
+    this.locumId = '',
+    this.appliedAt,
     this.rating,
     this.reviewCount = 0,
     this.avatarUrl,
@@ -35,6 +41,8 @@ class COLocumApplication {
       position,
       timestamp;
   final COLocumActivityStatus status;
+  final String locumId;
+  final DateTime? appliedAt;
   final double? rating;
   final int reviewCount;
   final String? avatarUrl;
@@ -49,14 +57,52 @@ class COLocumActivity extends StatelessWidget {
     this.onReject,
     this.onMessage,
   });
+  // Retained for source compatibility. Live data always uses the authenticated
+  // owner; supplied applications and action callbacks are not used.
   final String? clinicOwnerId;
   final List<COLocumApplication> applications;
 
-  /// Connect these actions to the application service and messaging system.
+  /// Reserved for future backend integration; all actions remain disabled.
   final ValueChanged<COLocumApplication>? onApprove, onReject, onMessage;
 
   @override
-  Widget build(BuildContext context) => DefaultTabController(
+  Widget build(BuildContext context) => StreamBuilder<User?>(
+    stream: FirebaseAuth.instance.authStateChanges(),
+    builder: (context, auth) {
+      if (auth.hasError) {
+        return _page(context, error: 'Unable to verify your session.');
+      }
+      if (auth.connectionState == ConnectionState.waiting) {
+        return _page(context, loading: true);
+      }
+      final user = auth.data;
+      if (user == null) {
+        return _page(context, error: 'Please sign in to view applications.');
+      }
+      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        key: ValueKey(user.uid),
+        stream: FirebaseFirestore.instance
+            .collection('applications')
+            .where('clinicOwnerId', isEqualTo: user.uid)
+            .snapshots(),
+        builder: (context, snapshot) => _page(
+          context,
+          documents: snapshot.data?.docs ?? const [],
+          loading: snapshot.connectionState == ConnectionState.waiting,
+          error: snapshot.hasError
+              ? 'Unable to load applications. Please try again later.'
+              : null,
+        ),
+      );
+    },
+  );
+
+  Widget _page(
+    BuildContext context, {
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> documents = const [],
+    bool loading = false,
+    String? error,
+  }) => DefaultTabController(
     length: 3,
     child: Scaffold(
       backgroundColor: const Color(0xFFF2FAFE),
@@ -90,14 +136,24 @@ class COLocumActivity extends StatelessWidget {
           Expanded(
             child: TabBarView(
               children: COLocumActivityStatus.values.map((status) {
-                // No sample applicants in live pages. Only show the current owner's jobs.
-                final items = applications
-                    .where(
-                      (application) =>
-                          clinicOwnerId != null &&
-                          application.clinicOwnerId == clinicOwnerId &&
-                          application.status == status,
-                    )
+                if (error != null) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(error, textAlign: TextAlign.center),
+                    ),
+                  );
+                }
+                if (loading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final storedStatus = switch (status) {
+                  COLocumActivityStatus.pending => 'pending',
+                  COLocumActivityStatus.current => 'hired',
+                  COLocumActivityStatus.completed => 'completed',
+                };
+                final items = documents
+                    .where((doc) => doc.data()['status'] == storedStatus)
                     .toList();
                 if (items.isEmpty) {
                   final message = switch (status) {
@@ -139,11 +195,10 @@ class COLocumActivity extends StatelessWidget {
                   itemBuilder: (context, index) => Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 560),
-                      child: _ApplicationCard(
-                        application: items[index],
-                        onApprove: onApprove,
-                        onReject: onReject,
-                        onMessage: onMessage,
+                      child: _FirestoreApplicationCard(
+                        key: ValueKey(items[index].id),
+                        document: items[index],
+                        status: status,
                       ),
                     ),
                   ),
@@ -169,15 +224,130 @@ class COLocumActivity extends StatelessWidget {
   );
 }
 
-class _ApplicationCard extends StatelessWidget {
-  const _ApplicationCard({
-    required this.application,
-    this.onApprove,
-    this.onReject,
-    this.onMessage,
+String _text(dynamic value, String fallback) =>
+    value is String && value.trim().isNotEmpty ? value : fallback;
+
+class _FirestoreApplicationCard extends StatelessWidget {
+  const _FirestoreApplicationCard({
+    super.key,
+    required this.document,
+    required this.status,
   });
+  final QueryDocumentSnapshot<Map<String, dynamic>> document;
+  final COLocumActivityStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = document.data();
+    final jobId = _text(data['jobId'], '');
+    if (jobId.isEmpty) return _card(context, data, null, 'Job unavailable');
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('job_postings')
+          .doc(jobId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final job = snapshot.data?.data();
+        final ownedJob =
+            job != null && job['clinicOwnerId'] == data['clinicOwnerId']
+            ? job
+            : null;
+        final fallback = snapshot.hasError
+            ? 'Unable to load job'
+            : snapshot.connectionState == ConnectionState.waiting
+            ? 'Loading job…'
+            : 'Job unavailable';
+        return _card(
+          context,
+          data,
+          snapshot.hasError ? null : ownedJob,
+          fallback,
+        );
+      },
+    );
+  }
+
+  Widget _card(
+    BuildContext context,
+    Map<String, dynamic> data,
+    Map<String, dynamic>? job,
+    String fallback,
+  ) {
+    final locumId = _text(data['locumId'], '');
+    if (locumId.isEmpty) {
+      return _applicantCard(
+        context,
+        data,
+        job,
+        fallback,
+        ApplicantSummary.fromFirestore(null),
+      );
+    }
+    return StreamBuilder<ApplicantSummary>(
+      key: ValueKey('${document.id}:$locumId'),
+      stream: ApplicationService().watchApplicantSummary(
+        applicationId: document.id,
+        locumId: locumId,
+      ),
+      builder: (context, snapshot) => _applicantCard(
+        context,
+        data,
+        job,
+        fallback,
+        snapshot.hasError
+            ? ApplicantSummary.fromFirestore(null)
+            : snapshot.data ?? ApplicantSummary.fromFirestore(null),
+        profileError: snapshot.hasError,
+        profileLoading: snapshot.connectionState == ConnectionState.waiting,
+      ),
+    );
+  }
+
+  Widget _applicantCard(
+    BuildContext context,
+    Map<String, dynamic> data,
+    Map<String, dynamic>? job,
+    String fallback,
+    ApplicantSummary applicant, {
+    bool profileError = false,
+    bool profileLoading = false,
+  }) {
+    final localizations = MaterialLocalizations.of(context);
+    final appliedAt = data['appliedAt'];
+    final date = job?['jobDate'];
+    final start = _text(job?['startTime'], '');
+    final end = _text(job?['endTime'], '');
+    return _ApplicationCard(
+      application: COLocumApplication(
+        id: document.id,
+        jobId: _text(data['jobId'], ''),
+        clinicOwnerId: _text(data['clinicOwnerId'], ''),
+        locumId: _text(data['locumId'], ''),
+        status: status,
+        appliedAt: appliedAt is Timestamp ? appliedAt.toDate() : null,
+        timestamp: appliedAt is Timestamp
+            ? 'Applied on ${localizations.formatMediumDate(appliedAt.toDate())}'
+            : 'Application date unavailable',
+        name: profileError
+            ? 'Applicant profile unavailable'
+            : profileLoading
+            ? 'Loading applicant...'
+            : applicant.displayName,
+        qualification: applicant.selfReportedQualification,
+        jobDate: date is Timestamp
+            ? localizations.formatMediumDate(date.toDate())
+            : fallback,
+        time: start.isNotEmpty && end.isNotEmpty ? '$start - $end' : fallback,
+        location: _text(job?['location'], fallback),
+        position: _text(job?['role'], fallback),
+      ),
+    );
+  }
+}
+
+class _ApplicationCard extends StatelessWidget {
+  const _ApplicationCard({required this.application});
   final COLocumApplication application;
-  final ValueChanged<COLocumApplication>? onApprove, onReject, onMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -206,7 +376,7 @@ class _ApplicationCard extends StatelessWidget {
       Color color,
       ValueChanged<COLocumApplication>? callback,
     ) => OutlinedButton.icon(
-      onPressed: callback == null ? null : () => callback(applicant),
+      onPressed: null,
       style: OutlinedButton.styleFrom(
         foregroundColor: color,
         side: BorderSide(
@@ -322,7 +492,7 @@ class _ApplicationCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: action('Reject', Icons.close, Colors.red, onReject),
+                    child: action('Reject', Icons.close, Colors.red, null),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -330,7 +500,7 @@ class _ApplicationCard extends StatelessWidget {
                       'Approve',
                       Icons.check,
                       const Color(0xFF00A83B),
-                      onApprove,
+                      null,
                     ),
                   ),
                 ],
@@ -340,7 +510,7 @@ class _ApplicationCard extends StatelessWidget {
                 'Message',
                 Icons.chat_bubble_outline,
                 const Color(0xFF263C80),
-                onMessage,
+                null,
               ),
           ],
         ),

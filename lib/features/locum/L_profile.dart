@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 
+import 'dart:async';
+
+import '../../services/locum_profile_service.dart';
+
 import 'L_jobProcessGuide.dart';
 import 'L_profile_data.dart';
 import 'L_verification_form.dart';
 
 /// Account tab content; the main page owns navigation and logout.
-class LProfile extends StatelessWidget {
+class LProfile extends StatefulWidget {
   const LProfile({
     super.key,
     required this.onLogout,
     required this.onContactUs,
     required this.onSavedJobs,
-    this.name = 'Nursarah Zulkaedah',
+    this.name = 'Locum',
     this.shiftHours = 0,
   });
 
@@ -20,6 +24,48 @@ class LProfile extends StatelessWidget {
   final VoidCallback onSavedJobs;
   final String name;
   final int shiftHours;
+
+  @override
+  State<LProfile> createState() => _LProfileState();
+}
+
+class _LProfileState extends State<LProfile> {
+  final _service = LocumProfileService.instance;
+  StreamSubscription<dynamic>? _authSubscription;
+  bool _loading = true;
+  String? _error;
+  int _request = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = _service.authStateChanges.listen((_) => _load());
+  }
+
+  Future<void> _load() async {
+    final request = ++_request;
+    final uid = _service.currentUid;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      if (uid == null) throw StateError('Please sign in to view your profile.');
+      await _service.load(uid);
+    } catch (_) {
+      if (!mounted || request != _request) return;
+      _error = uid == null
+          ? 'Please sign in to view your profile.'
+          : 'Unable to load profile. Please try again.';
+    }
+    if (mounted && request == _request) setState(() => _loading = false);
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
 
   static const _teal = Color(0xFF237F7D);
   static const _card = Color(0xFFEBF6F4);
@@ -53,10 +99,19 @@ class LProfile extends StatelessWidget {
           children: [
             const Icon(Icons.account_circle, size: 120, color: _teal),
             const SizedBox(height: 20),
+            if (_loading) const CircularProgressIndicator(),
+            if (_error != null) ...[
+              Text(_error!, textAlign: TextAlign.center),
+              TextButton(onPressed: _load, child: const Text('Retry')),
+            ],
             ValueListenableBuilder<LocumProfileData?>(
               valueListenable: locumProfileData,
               builder: (context, profile, _) => Text(
-                profile?.fields['Full Name'] ?? name,
+                !_loading &&
+                        _error == null &&
+                        profile?.uid == _service.currentUid
+                    ? (profile?.fields['Full Name'] ?? widget.name)
+                    : 'Locum',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 16,
@@ -88,7 +143,7 @@ class LProfile extends StatelessWidget {
                     ),
                     Expanded(
                       child: Text(
-                        '$shiftHours hours',
+                        '${widget.shiftHours} hours',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 22,
@@ -104,21 +159,24 @@ class LProfile extends StatelessWidget {
             _option(
               'Account Verification',
               Icons.how_to_reg,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  // Reuse the onboarding form, but prefill it and show Update.
-                  builder: (_) => const LVerificationForm(isEditing: true),
-                ),
-              ),
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    // Reuse the onboarding form, but prefill it and show Update.
+                    builder: (_) => const LVerificationForm(isEditing: true),
+                  ),
+                );
+                if (mounted) await _load();
+              },
             ),
             _option(
               'Job Process Guide',
               Icons.work,
               onTap: () => showLJobProcessGuide(context),
             ),
-            _option('Contact Us', Icons.chat, onTap: onContactUs),
-            _option('Saved Job', Icons.bookmark, onTap: onSavedJobs),
-            _option('Logout', Icons.logout, onTap: onLogout),
+            _option('Contact Us', Icons.chat, onTap: widget.onContactUs),
+            _option('Saved Job', Icons.bookmark, onTap: widget.onSavedJobs),
+            _option('Logout', Icons.logout, onTap: widget.onLogout),
           ],
         ),
       ),

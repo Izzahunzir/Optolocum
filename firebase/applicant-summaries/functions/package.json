@@ -1,0 +1,14 @@
+{
+  "name": "optolocum-applicant-summaries",
+  "private": true,
+  "main": "index.js",
+  "engines": { "node": "22" },
+  "scripts": {
+    "test": "node --test projection.test.js",
+    "backfill": "node backfill.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0"
+  }
+}

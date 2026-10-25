@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:optolocum/services/job_service.dart';
+import 'package:optolocum/services/locum_profile_service.dart';
 
 import '../../widgets/advertisement_strip.dart';
 import '../../widgets/logout_dialog.dart';
@@ -15,12 +16,8 @@ import 'L_contactUs.dart';
 import 'L_savedJob.dart';
 import 'L_profile_data.dart';
 
-enum LocumVerificationStatus { unverified, pending, verified }
-
-/// Set verified only from the account service after document review.
-final locumVerificationStatus = ValueNotifier(
-  LocumVerificationStatus.unverified,
-);
+export 'L_profile_data.dart'
+    show LocumVerificationStatus, locumVerificationStatus;
 
 class LMainPage extends StatefulWidget {
   const LMainPage({super.key});
@@ -51,6 +48,16 @@ class _LMainPageState extends State<LMainPage> {
   Future<void> _logout() async {
     final confirmed = await showLogoutDialog(context);
     if (confirmed != true || !mounted) return;
+    try {
+      await LocumProfileService.instance.signOut();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to log out. Please try again.')),
+      );
+      return;
+    }
+    if (!mounted) return;
     locumVerificationStatus.value = LocumVerificationStatus.unverified;
     locumSavedJobs.clear();
     locumProfileData.value = null;

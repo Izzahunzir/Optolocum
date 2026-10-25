@@ -1,0 +1,9 @@
+{
+  "name": "optolocum-firestore-only-rules-tests",
+  "private": true,
+  "scripts": { "test": "node --test rules.test.js" },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.1.0"
+  }
+}
