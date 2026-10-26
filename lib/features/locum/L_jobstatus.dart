@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 enum LocumJobStatus { hired, pending, rejected, completed }
 
@@ -27,49 +29,167 @@ class LocumJobApplication {
   final LocumJobStatus status;
 }
 
+    Stream<QuerySnapshot<Map<String, dynamic>>> locumApplicationsStream() {
+  final user = FirebaseAuth.instance.currentUser;
+
+  if (user == null) {
+    return const Stream.empty();
+  }
+
+  return FirebaseFirestore.instance
+      .collection('applications')
+      .where('locumId', isEqualTo: user.uid)
+      .snapshots();
+}
+
+    Future<Map<String, dynamic>?> getJobDetails(String jobId) async {
+  final doc = await FirebaseFirestore.instance
+      .collection('job_postings')
+      .doc(jobId)
+      .get();
+
+  if (!doc.exists) {
+    return null;
+  }
+
+  return doc.data();
+}
+
 class LJobStatus extends StatelessWidget {
   const LJobStatus({super.key});
 
   @override
-  Widget build(BuildContext context) => DefaultTabController(
-    length: 2,
-    child: Column(
-      children: [
-        const TabBar(
-          labelColor: Color(0xFF237F7D),
-          unselectedLabelColor: Color(0xFF237F7D),
-          indicatorColor: Color(0xFF237F7D),
-          indicatorSize: TabBarIndicatorSize.label,
-          dividerColor: Colors.transparent,
-          tabs: [
-            Tab(text: 'Applied'),
-            Tab(text: 'Completed'),
-          ],
-        ),
-        Expanded(
-          child: ValueListenableBuilder<List<LocumJobApplication>>(
-            valueListenable: locumJobApplications,
-            builder: (context, jobs, _) => TabBarView(
-              children: [
-                _ApplicationList(
-                  jobs: jobs
-                      .where((job) => job.status != LocumJobStatus.completed)
-                      .toList(),
-                ),
-                _ApplicationList(
-                  jobs: jobs
-                      .where((job) => job.status == LocumJobStatus.completed)
-                      .toList(),
-                  completed: true,
-                ),
-              ],
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          const TabBar(
+            labelColor: Color(0xFF237F7D),
+            unselectedLabelColor: Color(0xFF237F7D),
+            indicatorColor: Color(0xFF237F7D),
+            indicatorSize: TabBarIndicatorSize.label,
+            dividerColor: Colors.transparent,
+            tabs: [
+              Tab(text: 'Applied'),
+              Tab(text: 'Completed'),
+            ],
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: locumApplicationsStream(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Error loading applications: ${snapshot.error}'),
+                  );
+                }
+
+                if (!snapshot.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+
+                final applications = snapshot.data!.docs;
+
+                return FutureBuilder<List<LocumJobApplication>>(
+                  future: Future.wait(
+                    applications.map((application) async {
+                      final data = application.data();
+                      final jobId = data['jobId'];
+
+                      if (jobId is! String || jobId.isEmpty) {
+                        return null;
+                      }
+
+                      final job = await getJobDetails(jobId);
+
+                      if (job == null) return null;
+
+                      final status = switch (data['status']) {
+                        'hired' => LocumJobStatus.hired,
+                        'rejected' => LocumJobStatus.rejected,
+                        'completed' => LocumJobStatus.completed,
+                        _ => LocumJobStatus.pending,
+                      };
+
+                      String displayDate(dynamic value) {
+                        if (value is Timestamp) {
+                          final date = value.toDate();
+                          return '${date.day}/${date.month}/${date.year}';
+                        }
+                        return (value ?? '').toString();
+                      }
+
+                      return LocumJobApplication(
+                        id: application.id,
+                        title: (job['role'] ?? '').toString(),
+                        clinic: (job['placeName'] ?? '').toString(),
+                        address: (job['location'] ?? '').toString(),
+                        date: displayDate(job['jobDate']),
+                        hours:
+                            '${job['startTime'] ?? ''} - ${job['endTime'] ?? ''}',
+                        rate:
+                            '${job['payRate'] ?? ''} ${job['payRateUnit'] ?? ''}',
+                        owner: (job['contactPerson'] ?? '').toString(),
+                        phone: (job['contactNumber'] ?? '').toString(),
+                        notes: (job['jobDescription'] ?? '').toString(),
+                        status: status,
+                      );
+                    }),
+                  ).then(
+                    (jobs) => jobs.whereType<LocumJobApplication>().toList(),
+                  ),
+                  builder: (context, jobSnapshot) {
+                    if (jobSnapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Error loading job details: ${jobSnapshot.error}',
+                        ),
+                      );
+                    }
+
+                    if (!jobSnapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+
+                    final jobs = jobSnapshot.data!;
+
+                    return TabBarView(
+                      children: [
+                        _ApplicationList(
+                          jobs: jobs
+                              .where(
+                                (job) =>
+                                    job.status != LocumJobStatus.completed,
+                              )
+                              .toList(),
+                        ),
+                        _ApplicationList(
+                          jobs: jobs
+                              .where(
+                                (job) =>
+                                    job.status == LocumJobStatus.completed,
+                              )
+                              .toList(),
+                          completed: true,
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
+
 
 class _ApplicationList extends StatelessWidget {
   const _ApplicationList({required this.jobs, this.completed = false});
