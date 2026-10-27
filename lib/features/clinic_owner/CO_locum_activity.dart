@@ -19,6 +19,7 @@ class COLocumApplication {
     required this.status,
     required this.name,
     required this.qualification,
+    required this.verificationStatus,
     required this.jobDate,
     required this.time,
     required this.location,
@@ -42,6 +43,7 @@ class COLocumApplication {
       timestamp;
   final COLocumActivityStatus status;
   final String locumId;
+  final String verificationStatus;
   final DateTime? appliedAt;
   final double? rating;
   final int reviewCount;
@@ -334,6 +336,7 @@ class _FirestoreApplicationCard extends StatelessWidget {
             ? 'Loading applicant...'
             : applicant.displayName,
         qualification: applicant.selfReportedQualification,
+        verificationStatus: applicant.verificationStatus,
         jobDate: date is Timestamp
             ? localizations.formatMediumDate(date.toDate())
             : fallback,
@@ -348,6 +351,87 @@ class _FirestoreApplicationCard extends StatelessWidget {
 class _ApplicationCard extends StatelessWidget {
   const _ApplicationCard({required this.application});
   final COLocumApplication application;
+
+  void _showLocumDetails(BuildContext context) {
+    final applicant = application;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Locum Details',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text('Full Name: ${applicant.name}'),
+              const SizedBox(height: 12),
+              Text('Qualification: ${applicant.qualification}'),
+              const SizedBox(height: 12),
+              const Text(
+                'Account Verification',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    applicant.verificationStatus == 'verified'
+                        ? Icons.verified
+                        : applicant.verificationStatus == 'pending'
+                            ? Icons.access_time
+                            : Icons.info_outline,
+                    color: applicant.verificationStatus == 'verified'
+                        ? Colors.green
+                        : applicant.verificationStatus == 'pending'
+                            ? Colors.orange
+                            : Colors.grey,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    applicant.verificationStatus == 'verified'
+                        ? 'Verified'
+                        : applicant.verificationStatus == 'pending'
+                            ? 'Pending Verification'
+                            : 'Unverified',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text('Position Applied: ${applicant.position}'),
+              const SizedBox(height: 12),
+              Text('Job Date: ${applicant.jobDate}'),
+              const SizedBox(height: 12),
+              Text('Working Hours: ${applicant.time}'),
+              const SizedBox(height: 12),
+              Text('Location: ${applicant.location}'),
+              const SizedBox(height: 12),
+              const Text(
+                'Qualification information is self-reported and has not been independently verified.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -387,134 +471,138 @@ class _ApplicationCard extends StatelessWidget {
       icon: Icon(icon, size: 18),
       label: Text(label),
     );
-    return Card(
-      color: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (applicant.timestamp.isNotEmpty)
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  applicant.timestamp,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF666666),
+    return InkWell(
+      onTap: () => _showLocumDetails(context),
+      borderRadius: BorderRadius.circular(5),
+      child: Card(
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (applicant.timestamp.isNotEmpty)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    applicant.timestamp,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF666666),
+                    ),
                   ),
                 ),
-              ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                SizedBox(
-                  width: 52,
-                  height: 52,
-                  child: ClipOval(
-                    child: applicant.avatarUrl == null
-                        ? const ColoredBox(
-                            color: Color(0xFFECEDF6),
-                            child: Icon(
-                              Icons.person,
-                              size: 36,
-                              color: Color(0xFF263C80),
-                            ),
-                          )
-                        : Image.network(
-                            applicant.avatarUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, error, stack) =>
-                                const Icon(Icons.person, size: 36),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        applicant.name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        applicant.qualification,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF666666),
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      if (applicant.rating != null)
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.star,
-                              size: 15,
-                              color: Color(0xFFFFBC00),
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                '${applicant.rating!.toStringAsFixed(1)} (${applicant.reviewCount} reviews)',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF666666),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
-            detail(
-              Icons.calendar_today_outlined,
-              'Job Date',
-              applicant.jobDate,
-            ),
-            detail(Icons.access_time, 'Time', applicant.time),
-            detail(Icons.location_on_outlined, 'Location', applicant.location),
-            detail(Icons.description_outlined, 'Position', applicant.position),
-            const SizedBox(height: 8),
-            if (applicant.status == COLocumActivityStatus.pending)
+              const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(
-                    child: action('Reject', Icons.close, Colors.red, null),
+                  SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: ClipOval(
+                      child: applicant.avatarUrl == null
+                          ? const ColoredBox(
+                              color: Color(0xFFECEDF6),
+                              child: Icon(
+                                Icons.person,
+                                size: 36,
+                                color: Color(0xFF263C80),
+                              ),
+                            )
+                          : Image.network(
+                              applicant.avatarUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, error, stack) =>
+                                  const Icon(Icons.person, size: 36),
+                            ),
+                    ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 14),
                   Expanded(
-                    child: action(
-                      'Approve',
-                      Icons.check,
-                      const Color(0xFF00A83B),
-                      null,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          applicant.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          applicant.qualification,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF666666),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        if (applicant.rating != null)
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.star,
+                                size: 15,
+                                color: Color(0xFFFFBC00),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  '${applicant.rating!.toStringAsFixed(1)} (${applicant.reviewCount} reviews)',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF666666),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
                     ),
                   ),
                 ],
-              )
-            else
-              action(
-                'Message',
-                Icons.chat_bubble_outline,
-                const Color(0xFF263C80),
-                null,
               ),
-          ],
+              const SizedBox(height: 28),
+              detail(
+                Icons.calendar_today_outlined,
+                'Job Date',
+                applicant.jobDate,
+              ),
+              detail(Icons.access_time, 'Time', applicant.time),
+              detail(Icons.location_on_outlined, 'Location', applicant.location),
+              detail(Icons.description_outlined, 'Position', applicant.position),
+              const SizedBox(height: 8),
+              if (applicant.status == COLocumActivityStatus.pending)
+                Row(
+                  children: [
+                    Expanded(
+                      child: action('Reject', Icons.close, Colors.red, null),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: action(
+                        'Approve',
+                        Icons.check,
+                        const Color(0xFF00A83B),
+                        null,
+                      ),
+                    ),
+                  ],
+                )
+              else
+                action(
+                  'Message',
+                  Icons.chat_bubble_outline,
+                  const Color(0xFF263C80),
+                  null,
+                ),
+            ],
+          ),
         ),
-      ),
+        ),
     );
   }
 }

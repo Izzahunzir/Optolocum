@@ -10,6 +10,7 @@ class ApplicantSummary {
     required this.fullName,
     required this.highestEducation,
     required this.course,
+    this.verificationStatus = 'unverified',
   });
 
   factory ApplicantSummary.fromFirestore(Map<String, dynamic>? data) {
@@ -22,12 +23,16 @@ class ApplicantSummary {
       fullName: field('fullName'),
       highestEducation: field('highestEducation'),
       course: field('course'),
+      verificationStatus: field('verificationStatus').isEmpty
+          ? 'unverified'
+          : field('verificationStatus'),
     );
   }
 
   final String fullName;
   final String highestEducation;
   final String course;
+  final String verificationStatus;
 
   String get displayName => fullName.isEmpty ? 'Locum Applicant' : fullName;
 
@@ -49,6 +54,7 @@ class ApplicantSummary {
     'fullName': fullName,
     'highestEducation': highestEducation,
     'course': course,
+    'verificationStatus': verificationStatus,
   };
 }
 
@@ -90,8 +96,18 @@ class ApplicationService {
     // Preserve saved values exactly so the rules can compare them with the
     // private profile. Never copy the complete profile or local file paths.
     return {
-      for (final key in ['fullName', 'highestEducation', 'course'])
+      for (final key in [
+        'fullName',
+        'highestEducation',
+        'course',
+      ])
         key: profile[key] is String ? profile[key] as String : '',
+      'verificationStatus':
+          profile['verificationStatus'] == 'verified'
+              ? 'verified'
+              : profile['verificationStatus'] == 'pending'
+                  ? 'pending'
+                  : 'unverified',
     };
   }
 

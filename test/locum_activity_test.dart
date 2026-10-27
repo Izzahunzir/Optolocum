@@ -40,6 +40,7 @@ void main() {
         status: status,
         name: id,
         qualification: 'BOptom (Hons)',
+        verificationStatus: 'unverified',
         jobDate: '12 May 2026',
         time: '9:00 AM - 5:00 PM',
         location: 'Vision Care Clinic, Central Mall',
