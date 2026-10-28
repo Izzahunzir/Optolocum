@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../intro/intro_page.dart';
 import '../../widgets/logout_dialog.dart';
@@ -67,6 +68,16 @@ class COProfile extends StatelessWidget {
   Future<void> _logout(BuildContext context) async {
     final confirmed = await showLogoutDialog(context);
     if (confirmed != true || !context.mounted) return;
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to log out. Please try again.')),
+      );
+      return;
+    }
+    if (!context.mounted) return;
     coVerificationStatus.value = COVerificationStatus.unverified;
     coJobPostings.value = const [];
     Navigator.of(context).pushAndRemoveUntil(

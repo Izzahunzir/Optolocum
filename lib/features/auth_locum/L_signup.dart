@@ -20,6 +20,7 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool _isSubmitting = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -97,10 +98,25 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
         const SizedBox(height: 5),
         TextFormField(
           controller: controller,
-          decoration: _decoration(hint),
+          decoration: _decoration(hint).copyWith(
+            suffixIcon: obscureText
+                ? IconButton(
+                    tooltip: _obscurePassword
+                        ? 'Show password'
+                        : 'Hide password',
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                  )
+                : null,
+          ),
           keyboardType: keyboardType,
           autofillHints: autofillHints,
-          obscureText: obscureText,
+          obscureText: obscureText && _obscurePassword,
           autocorrect: !obscureText,
           enableSuggestions: !obscureText,
           textCapitalization: label == 'Full Name'
@@ -143,16 +159,6 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
                     constraints: const BoxConstraints(maxWidth: 400),
                     child: Column(
                       children: [
-                        const CircleAvatar(
-                          radius: 60,
-                          backgroundColor: Color(0xFFEAEAEA),
-                          child: Icon(
-                            Icons.person,
-                            size: 90,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 42),
                         Container(
                           padding: const EdgeInsets.fromLTRB(26, 34, 26, 24),
                           decoration: BoxDecoration(

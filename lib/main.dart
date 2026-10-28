@@ -1,15 +1,13 @@
-
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+
 import 'firebase_options.dart';
 import 'features/intro/intro_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(const MyApp());
 }
@@ -24,9 +22,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF237F7D),
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF237F7D)),
         pageTransitionsTheme: PageTransitionsTheme(
           builders: {
             for (final platform in TargetPlatform.values)

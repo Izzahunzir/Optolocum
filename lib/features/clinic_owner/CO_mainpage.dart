@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:optolocum/services/job_service.dart';
 
 import '../../widgets/advertisement_strip.dart';
@@ -13,7 +13,9 @@ import 'CO_postingjob.dart';
 
 /// Homepage for verified clinic owners. Pass false behind the verification prompt.
 class COMainPage extends StatefulWidget {
-  const COMainPage({super.key, this.isVerified});
+  const COMainPage({super.key, this.isVerified, this.jobsStream});
+
+  final Stream<List<COJobPosting>>? jobsStream;
 
   /// Optional preview override. Live pages follow account verification status.
   final bool? isVerified;
@@ -26,6 +28,13 @@ class _COMainPageState extends State<COMainPage> {
   final _search = TextEditingController();
   bool _searchOpen = false;
   bool _newestFirst = true;
+  late final _jobsStream =
+      widget.jobsStream ??
+      JobService().getMyJobs().map(
+        (snapshot) => snapshot.docs
+            .map((doc) => jobFromFirestore(doc.data(), jobId: doc.id))
+            .toList(),
+      );
 
   @override
   void dispose() {
@@ -42,44 +51,39 @@ class _COMainPageState extends State<COMainPage> {
   }
 
   @override
-Widget build(BuildContext context) {
-  return ValueListenableBuilder<COVerificationStatus>(
-    valueListenable: coVerificationStatus,
-    builder: (context, status, _) {
-      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: JobService().getMyJobs(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Scaffold(
-              body: Center(
-                child: Text('Failed to load jobs: ${snapshot.error}'),
-              ),
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<COVerificationStatus>(
+      valueListenable: coVerificationStatus,
+      builder: (context, status, _) {
+        return StreamBuilder<List<COJobPosting>>(
+          stream: _jobsStream,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Scaffold(
+                body: Center(
+                  child: Text('Failed to load jobs: ${snapshot.error}'),
+                ),
+              );
+            }
+
+            if (!snapshot.hasData) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final jobs = snapshot.data!;
+
+            return _buildPage(
+              context,
+              widget.isVerified ?? status == COVerificationStatus.verified,
+              jobs,
             );
-          }
-
-          if (!snapshot.hasData) {
-            return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-          }
-
-          final jobs = snapshot.data!.docs
-              .map((doc) => jobFromFirestore(doc.data(), jobId: doc.id))
-              .toList();
-
-          return _buildPage(
-            context,
-            widget.isVerified ??
-                status == COVerificationStatus.verified,
-            jobs,
-          );
-        },
-      );
-    },
-  );
-}
+          },
+        );
+      },
+    );
+  }
 
   Widget _buildPage(
     BuildContext context,
@@ -91,7 +95,8 @@ Widget build(BuildContext context) {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
+            Container(
+              color: _blue,
               padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
               child: Row(
                 children: [
@@ -110,7 +115,7 @@ Widget build(BuildContext context) {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               suffixIcon: IconButton(
-                                tooltip: 'Close search',
+                                tooltip: 'Clear search',
                                 onPressed: () {
                                   _search.clear();
                                   FocusScope.of(context).unfocus();
@@ -123,6 +128,7 @@ Widget build(BuildContext context) {
                         : const Text(
                             'Posted Jobs',
                             style: TextStyle(
+                              color: Colors.white,
                               fontSize: 24,
                               fontWeight: FontWeight.w700,
                             ),
@@ -137,7 +143,7 @@ Widget build(BuildContext context) {
                         FocusScope.of(context).unfocus();
                       }
                     }),
-                    icon: const Icon(Icons.search, color: Colors.black),
+                    icon: const Icon(Icons.search, color: Colors.white),
                   ),
                   PopupMenuButton<bool>(
                     tooltip: 'Filter jobs',
@@ -155,11 +161,12 @@ Widget build(BuildContext context) {
                         child: const Text('Oldest to Recent'),
                       ),
                     ],
-                    icon: const Icon(Icons.filter_alt, color: Colors.black),
+                    icon: const Icon(Icons.filter_alt, color: Colors.white),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 8),
             const AdvertisementStrip(
               key: Key('clinic-owner-ads'),
               horizontalPadding: 12,
@@ -317,7 +324,11 @@ Widget build(BuildContext context) {
 
   Widget _postedJobs(List<COJobPosting> jobs) {
     final query = _search.text.trim().toLowerCase();
-    final ordered = _newestFirst ? jobs.reversed : jobs;
+    final chronological = jobs.toList()
+      ..sort(
+        (a, b) => (a.createdAt ?? a.date).compareTo(b.createdAt ?? b.date),
+      );
+    final ordered = _newestFirst ? chronological.reversed : chronological;
     final results = ordered
         .where(
           (job) => [
@@ -326,6 +337,7 @@ Widget build(BuildContext context) {
             job.location,
             job.description,
             job.contactPerson,
+            job.contactNumber,
           ].any((value) => value.toLowerCase().contains(query)),
         )
         .toList();

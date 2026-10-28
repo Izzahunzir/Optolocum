@@ -144,6 +144,8 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
   final _link = TextEditingController();
   final _password = TextEditingController();
   bool _saving = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmation = true;
 
   String? get _code =>
       Uri.tryParse(_link.text.trim())?.queryParameters['oobCode'];
@@ -220,8 +222,22 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
           const SizedBox(height: 22),
           TextFormField(
             controller: _password,
-            decoration: _decoration('New Password', 'Enter new password'),
-            obscureText: true,
+            decoration: _decoration('New Password', 'Enter new password')
+                .copyWith(
+                  suffixIcon: IconButton(
+                    tooltip: _obscurePassword
+                        ? 'Show password'
+                        : 'Hide password',
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                  ),
+                ),
+            obscureText: _obscurePassword,
             autocorrect: false,
             enableSuggestions: false,
             autofillHints: const [AutofillHints.newPassword],
@@ -231,11 +247,26 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
           ),
           const SizedBox(height: 22),
           TextFormField(
-            decoration: _decoration(
-              'Confirm New Password',
-              'Confirm new password',
-            ),
-            obscureText: true,
+            decoration:
+                _decoration(
+                  'Confirm New Password',
+                  'Confirm new password',
+                ).copyWith(
+                  suffixIcon: IconButton(
+                    tooltip: _obscureConfirmation
+                        ? 'Show password'
+                        : 'Hide password',
+                    icon: Icon(
+                      _obscureConfirmation
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                    ),
+                    onPressed: () => setState(
+                      () => _obscureConfirmation = !_obscureConfirmation,
+                    ),
+                  ),
+                ),
+            obscureText: _obscureConfirmation,
             autocorrect: false,
             enableSuggestions: false,
             autofillHints: const [AutofillHints.newPassword],

@@ -11,6 +11,28 @@ class AdvertisementStrip extends StatelessWidget {
     'assets/images/ads 3.jpg',
   ];
 
+  void _showAdvertisement(BuildContext context, int index) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        clipBehavior: Clip.antiAlias,
+        insetPadding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 600,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+          ),
+          child: Image.asset(
+            _images[index],
+            fit: BoxFit.contain,
+            semanticLabel: 'Advertisement ${index + 1}',
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
@@ -29,15 +51,19 @@ class AdvertisementStrip extends StatelessWidget {
             width: cardSize,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: ColoredBox(
+              child: Material(
                 color: Colors.white,
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Image.asset(
-                    _images[index],
-                    width: double.infinity,
-                    height: double.infinity,
-                    fit: BoxFit.fill,
+                child: InkWell(
+                  onTap: () => _showAdvertisement(context, index),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Image.asset(
+                      _images[index],
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.fill,
+                      semanticLabel: 'Open advertisement ${index + 1}',
+                    ),
                   ),
                 ),
               ),

@@ -21,6 +21,7 @@ class _LocumSigninPageState extends State<LocumSigninPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool _isSubmitting = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -95,16 +96,6 @@ class _LocumSigninPageState extends State<LocumSigninPage> {
                   constraints: const BoxConstraints(maxWidth: 400),
                   child: Column(
                     children: [
-                      const CircleAvatar(
-                        radius: 60,
-                        backgroundColor: Color(0xFFEAEAEA),
-                        child: Icon(
-                          Icons.person,
-                          size: 90,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 72),
                       Container(
                         padding: const EdgeInsets.fromLTRB(26, 34, 26, 22),
                         decoration: BoxDecoration(
@@ -162,8 +153,23 @@ class _LocumSigninPageState extends State<LocumSigninPage> {
                                 const SizedBox(height: 5),
                                 TextFormField(
                                   controller: passwordController,
-                                  decoration: _decoration(''),
-                                  obscureText: true,
+                                  decoration: _decoration('').copyWith(
+                                    suffixIcon: IconButton(
+                                      tooltip: _obscurePassword
+                                          ? 'Show password'
+                                          : 'Hide password',
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility
+                                            : Icons.visibility_off,
+                                      ),
+                                      onPressed: () => setState(
+                                        () => _obscurePassword =
+                                            !_obscurePassword,
+                                      ),
+                                    ),
+                                  ),
+                                  obscureText: _obscurePassword,
                                   autocorrect: false,
                                   enableSuggestions: false,
                                   autofillHints: const [AutofillHints.password],

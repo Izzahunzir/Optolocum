@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:optolocum/features/clinic_owner/CO_mainpage.dart';
@@ -7,10 +9,13 @@ void main() {
   testWidgets('Home updates with posts, searches and sorts by posting order', (
     tester,
   ) async {
-    coJobPostings.value = const [];
-    addTearDown(() => coJobPostings.value = const []);
-    await tester.pumpWidget(const MaterialApp(home: COMainPage()));
+    final jobs = StreamController<List<COJobPosting>>();
+    addTearDown(jobs.close);
+    await tester.pumpWidget(
+      MaterialApp(home: COMainPage(jobsStream: jobs.stream)),
+    );
     COJobPosting posting(String role, String location) => COJobPosting(
+      createdAt: DateTime(2026, 10, role == 'Older role' ? 1 : 2),
       placeName: 'Vision Clinic',
       location: location,
       role: role,
@@ -23,10 +28,10 @@ void main() {
       contactPerson: 'Natalie',
       contactNumber: '0123456789',
     );
-    coJobPostings.value = [
+    jobs.add([
       posting('Older role', 'Kuala Lumpur'),
       posting('Newer role', 'Johor'),
-    ];
+    ]);
     await tester.pumpAndSettle();
     expect(
       tester
@@ -38,7 +43,12 @@ void main() {
     );
     await tester.tap(find.byTooltip('Filter jobs'));
     await tester.pumpAndSettle();
-      await tester.tap(find.ancestor(of: find.text('Oldest to Recent'), matching: find.byType(CheckedPopupMenuItem<bool>)));
+    await tester.tap(
+      find.ancestor(
+        of: find.text('Oldest to Recent'),
+        matching: find.byType(CheckedPopupMenuItem<bool>),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(
       tester
