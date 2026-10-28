@@ -20,7 +20,9 @@ export 'L_profile_data.dart'
     show LocumVerificationStatus, locumVerificationStatus;
 
 class LMainPage extends StatefulWidget {
-  const LMainPage({super.key});
+  const LMainPage({super.key, this.jobsStream});
+
+  final Stream<QuerySnapshot<Map<String, dynamic>>>? jobsStream;
 
   @override
   State<LMainPage> createState() => _LMainPageState();
@@ -32,6 +34,16 @@ class _LMainPageState extends State<LMainPage> {
   bool _showSavedJobs = false;
   bool _searching = false;
   String _filter = 'All jobs';
+  final _search = TextEditingController();
+  late final _jobsStream = widget.jobsStream ?? JobService().getAvailableJobs();
+  List<String> _locations = const [];
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
   static const _tabs = [
     'Home',
     'Job Status',
@@ -117,8 +129,13 @@ class _LMainPageState extends State<LMainPage> {
                             ),
                             IconButton(
                               tooltip: 'Search jobs',
-                              onPressed: () =>
-                                  setState(() => _searching = !_searching),
+                              onPressed: () => setState(() {
+                                _searching = !_searching;
+                                if (!_searching) {
+                                  _search.clear();
+                                  FocusScope.of(context).unfocus();
+                                }
+                              }),
                               icon: const Icon(Icons.search),
                             ),
                             PopupMenuButton<String>(
@@ -126,29 +143,42 @@ class _LMainPageState extends State<LMainPage> {
                               initialValue: _filter,
                               onSelected: (value) =>
                                   setState(() => _filter = value),
-                              itemBuilder: (_) =>
-                                  ['All jobs', 'Nearby', 'Part time']
-                                      .map(
-                                        (value) => PopupMenuItem(
-                                          value: value,
-                                          child: Text(value),
-                                        ),
-                                      )
-                                      .toList(),
+                              itemBuilder: (_) => ['All jobs', ..._locations]
+                                  .map(
+                                    (value) => PopupMenuItem(
+                                      value: value,
+                                      child: Text(value),
+                                    ),
+                                  )
+                                  .toList(),
                               icon: const Icon(Icons.filter_alt),
                             ),
                           ],
                         ),
                         if (_searching)
-                          const TextField(
+                          TextField(
+                            controller: _search,
+                            autofocus: true,
+                            onChanged: (_) => setState(() {}),
                             decoration: InputDecoration(
                               hintText: 'Search jobs',
-                              prefixIcon: Icon(Icons.search),
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: IconButton(
+                                tooltip: 'Clear search',
+                                icon: const Icon(Icons.clear),
+                                onPressed: () => setState(_search.clear),
+                              ),
                             ),
                           ),
-                        if (_filter != 'All jobs') Chip(label: Text(_filter)),
+                        if (_filter != 'All jobs')
+                          Chip(
+                            label: Text(_filter),
+                            onDeleted: () =>
+                                setState(() => _filter = 'All jobs'),
+                          ),
                         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                          stream: JobService().getAvailableJobs(),
+                          key: const ValueKey('locum-job-results'),
+                          stream: _jobsStream,
                           builder: (context, snapshot) {
                             if (snapshot.hasError) {
                               return Text(
@@ -160,7 +190,49 @@ class _LMainPageState extends State<LMainPage> {
                                 child: CircularProgressIndicator(),
                               );
                             }
-                            final jobs = snapshot.data!.docs;
+                            final allJobs = snapshot.data!.docs;
+                            _locations =
+                                allJobs
+                                    .map(
+                                      (doc) => (doc.data()['location'] ?? '')
+                                          .toString()
+                                          .trim(),
+                                    )
+                                    .where(
+                                      (location) =>
+                                          location.isNotEmpty &&
+                                          location != 'All jobs',
+                                    )
+                                    .toSet()
+                                    .toList()
+                                  ..sort();
+                            final query = _search.text.trim().toLowerCase();
+                            final jobs = allJobs.where((doc) {
+                              final job = doc.data();
+                              return (_filter == 'All jobs' ||
+                                      (job['location'] ?? '')
+                                              .toString()
+                                              .trim() ==
+                                          _filter) &&
+                                  [
+                                    'role',
+                                    'placeName',
+                                    'location',
+                                    'jobDescription',
+                                  ].any(
+                                    (key) => (job[key] ?? '')
+                                        .toString()
+                                        .toLowerCase()
+                                        .contains(query),
+                                  );
+                            }).toList();
+                            if (jobs.isEmpty) {
+                              return Text(
+                                allJobs.isEmpty
+                                    ? 'No jobs available'
+                                    : 'No matching jobs',
+                              );
+                            }
                             return Column(
                               children: jobs.map((doc) {
                                 return LocumJobCard(
@@ -244,11 +316,6 @@ class LocumJobCard extends StatelessWidget {
         : '${date.day}/${date.month}/${date.year}';
     final startTime = job['startTime'] ?? '-';
     final endTime = job['endTime'] ?? '-';
-    final payUnit = job['payRateUnit'] == 'per_hour'
-        ? '/hour'
-        : job['payRateUnit'] == 'per_day'
-        ? '/day'
-        : '/shift';
 
     const iconColor = Color(0xFF17213D);
     const greenColor = Color(0xFF248783);
@@ -342,19 +409,6 @@ class LocumJobCard extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-          infoRow(
-            Icons.account_balance_wallet_outlined,
-            'RM ${job['payRate'] ?? 0}$payUnit',
-          ),
-          const SizedBox(height: 8),
-          infoRow(
-            Icons.person_outline,
-            job['contactPerson'] ?? 'Contact person unavailable',
-          ),
-          infoRow(
-            Icons.phone_outlined,
-            job['contactNumber'] ?? 'Contact unavailable',
           ),
           const SizedBox(height: 16),
           Row(

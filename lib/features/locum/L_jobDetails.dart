@@ -82,6 +82,7 @@ class LJobDetails extends StatelessWidget {
         backgroundColor: const Color(0xFF248783),
         foregroundColor: Colors.white,
         titleTextStyle: const TextStyle(
+          color: Colors.white,
           fontSize: 20,
           fontWeight: FontWeight.w600,
         ),

@@ -13,6 +13,7 @@ import 'CO_profile.dart';
 class COJobPosting {
   const COJobPosting({
     this.jobId,
+    this.createdAt,
     required this.placeName,
     required this.location,
     required this.role,
@@ -35,6 +36,7 @@ class COJobPosting {
       contactPerson,
       contactNumber;
   final DateTime date;
+  final DateTime? createdAt;
   final TimeOfDay start, end;
   final double pay;
   final String? imageUrl;
@@ -68,6 +70,7 @@ COJobPosting jobFromFirestore(
 
   return COJobPosting(
     jobId: jobId,
+    createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     placeName: data['placeName'] as String,
     location: data['location'] as String,
     role: data['role'] as String,
@@ -379,8 +382,11 @@ class COPostedJobCard extends StatelessWidget {
       String text, {
       String? caption,
       bool bold = true,
+      bool centerVertically = false,
     }) => Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: centerVertically
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 26, color: ink),
         const SizedBox(width: 8),
@@ -459,29 +465,6 @@ class COPostedJobCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: SizedBox(
-                    width: 92,
-                    height: 72,
-                    child: job.imageUrl == null
-                        ? const ColoredBox(
-                            color: Color(0xFFC5DFEE),
-                            child: Icon(
-                              Icons.storefront_outlined,
-                              size: 38,
-                              color: Color(0xFF3B4E92),
-                            ),
-                          )
-                        : Image.network(
-                            job.imageUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, error, stack) =>
-                                const Icon(Icons.storefront_outlined, size: 38),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -494,12 +477,17 @@ class COPostedJobCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      detail(Icons.business_outlined, job.placeName),
+                      detail(
+                        Icons.business_outlined,
+                        job.placeName,
+                        centerVertically: true,
+                      ),
                       const SizedBox(height: 6),
                       detail(
                         Icons.location_on_outlined,
                         job.location,
                         bold: false,
+                        centerVertically: true,
                       ),
                     ],
                   ),
@@ -514,12 +502,11 @@ class COPostedJobCard extends StatelessWidget {
                   flex: 10,
                   child: detail(
                     Icons.calendar_today_outlined,
-                    MaterialLocalizations.of(context)
-                        .formatMediumDate(job.date),
+                    MaterialLocalizations.of(context).formatMediumDate(job.date),
                     caption: '(One day)',
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   flex: 13,
                   child: detail(
@@ -528,18 +515,21 @@ class COPostedJobCard extends StatelessWidget {
                     caption: '($duration hrs)',
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 10,
-                  child: detail(
-                    Icons.account_balance_wallet_outlined,
-                    'RM ${job.pay.toStringAsFixed(2)} ${job.payUnit.toLowerCase()}',
-                  ),
-                ),
               ],
             ),
+            const SizedBox(height: 12),
+            detail(
+              Icons.account_balance_wallet_outlined,
+              'RM ${job.pay.toStringAsFixed(2)} ${job.payUnit.toLowerCase()}',
+              centerVertically: true,
+            ),
             const SizedBox(height: 20),
-            detail(Icons.person_outline, job.contactPerson, bold: false),
+            detail(
+              Icons.person_outline,
+              job.contactPerson,
+              bold: false,
+              centerVertically: true,
+            ),
             const SizedBox(height: 12),
             LayoutBuilder(
               builder: (context, constraints) {
@@ -552,6 +542,7 @@ class COPostedJobCard extends StatelessWidget {
                         Icons.phone_outlined,
                         job.contactNumber,
                         bold: false,
+                        centerVertically: true,
                       ),
                       const SizedBox(height: 10),
                       Align(alignment: Alignment.centerRight, child: badge),
@@ -565,6 +556,7 @@ class COPostedJobCard extends StatelessWidget {
                         Icons.phone_outlined,
                         job.contactNumber,
                         bold: false,
+                        centerVertically: true,
                       ),
                     ),
                     const SizedBox(width: 12),
