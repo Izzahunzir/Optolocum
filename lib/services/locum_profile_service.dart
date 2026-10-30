@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../features/locum/L_profile_data.dart';
 import 'application_service.dart';
+import 'locum_profile_store.dart';
 
 class LocumProfileService {
   LocumProfileService._() {
@@ -105,10 +106,7 @@ class LocumProfileService {
     if (profile.verificationStatus != 'pending') {
       throw ArgumentError('Profile submissions must remain pending.');
     }
-    await _firestore.collection('locum_profiles').doc(profile.uid).set({
-      ...profile.toFirestore(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await LocumProfileStore(_firestore).save(profile);
     _checkAccount(profile.uid, generation);
     _cache(profile);
     _refreshApplicantSummaries(profile.uid);
