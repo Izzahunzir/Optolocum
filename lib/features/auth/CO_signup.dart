@@ -1,4 +1,5 @@
 import 'package:optolocum/services/auth_service.dart';
+import 'package:optolocum/services/practice_owner_profile_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -14,13 +15,20 @@ class CompanyOwnerSignupPage extends StatefulWidget {
 class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
   static const _blue = Color(0xFF263C80);
   final _formKey = GlobalKey<FormState>();
+  final fullNameController = TextEditingController();
+  final phoneNumberController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  String? _selectedRole;
+  String? _pendingUid;
+  String? _pendingEmail;
   bool _isSubmitting = false;
   bool _obscurePassword = true;
 
   @override
   void dispose() {
+    fullNameController.dispose();
+    phoneNumberController.dispose();
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
@@ -30,10 +38,41 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
     if (_isSubmitting || !_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
+    // Capture the validated form before the first asynchronous operation.
+    final email = emailController.text.trim();
+    final fullName = fullNameController.text.trim();
+    final phoneNumber = phoneNumberController.text.trim();
+    final role = _selectedRole!;
     try {
-      await AuthService().signUp(
-        email: emailController.text,
-        password: passwordController.text,
+      if (_pendingUid == null) {
+        final credential = await AuthService().signUp(
+          email: email,
+          password: passwordController.text,
+        );
+        _pendingUid = credential.user!.uid;
+        _pendingEmail = credential.user!.email ?? email;
+      }
+      // Do not attach a failed signup to another account if auth state changes.
+      if (FirebaseAuth.instance.currentUser?.uid != _pendingUid ||
+          email.toLowerCase() != _pendingEmail!.toLowerCase()) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Your account was created, but the profile is incomplete. '
+              'Keep the original signup email and account signed in to retry. '
+              'If you signed out, contact support to complete your profile.',
+            ),
+          ),
+        );
+        return;
+      }
+      await PracticeOwnerProfileService().create(
+        uid: _pendingUid!,
+        fullName: fullName,
+        email: _pendingEmail!,
+        phoneNumber: phoneNumber,
+        role: role,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -46,7 +85,28 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.message ?? 'Authentication failed: ${e.code}'),
+          content: Text(
+            e.code == 'email-already-in-use'
+                ? 'An account already exists for this email. Please log in. '
+                      'If a previous signup could not save your profile, '
+                      'contact support to complete it.'
+                : (e.message ?? 'Authentication failed. Please try again.'),
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _pendingUid == null
+                ? 'We could not complete signup. Please try again. '
+                      'If your email is already registered, log in or contact support.'
+                : 'Your account was created, but we could not save your profile. '
+                      'Keep this screen open and tap Sign Up again to retry. '
+                      'If you leave this screen, log in with the same email and '
+                      'contact support to complete your profile.',
+          ),
         ),
       );
     } finally {
@@ -182,6 +242,7 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
                                   const SizedBox(height: 24),
                                   _field(
                                     label: 'Full Name',
+                                    controller: fullNameController,
                                     hint: 'Ali Bin Abu',
                                     autofillHints: const [AutofillHints.name],
                                     validator: (value) =>
@@ -203,6 +264,7 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
                                   ),
                                   _field(
                                     label: 'Phone Number',
+                                    controller: phoneNumberController,
                                     hint: '+0123456789',
                                     keyboardType: TextInputType.phone,
                                     autofillHints: const [
@@ -258,7 +320,7 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
                                               ),
                                             )
                                             .toList(),
-                                    onChanged: (_) {},
+                                    onChanged: (value) => _selectedRole = value,
                                     validator: (value) => value == null
                                         ? 'Select your role'
                                         : null,
