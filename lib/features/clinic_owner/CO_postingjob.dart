@@ -8,6 +8,7 @@ import 'dart:async';
 import 'CO_navigation.dart';
 import 'CO_mainpage.dart';
 import 'CO_profile.dart';
+import 'CO_locum_activity.dart';
 
 /// Session-only posting data. Replace with account-scoped persistence later.
 class COJobPosting {
@@ -431,26 +432,52 @@ class COPostedJobCard extends StatelessWidget {
       builder: (context, snapshot) {
         final count = snapshot.data?.docs.length ?? 0;
 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF263C80),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.groups_outlined, size: 25, color: Colors.white),
-              const SizedBox(width: 6),
-              Text(
-                '$count locum applied',
-                style: const TextStyle(fontSize: 12, color: Colors.white),
-              ),
-            ],
+        return InkWell(
+          onTap: job.jobId == null
+              ? null
+              : () {
+                  Navigator.push(
+                    context,
+                  MaterialPageRoute<void>(
+                      builder: (_) => COLocumActivity(
+                        jobId: job.jobId,
+                    ),
+                  ),
+                );
+              },
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xFF263C80),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.groups_outlined,
+                  size: 25,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '$count locum applied',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
     );
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       color: const Color(0xFFDDF0FF),

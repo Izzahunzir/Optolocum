@@ -53,6 +53,7 @@ class COLocumApplication {
 class COLocumActivity extends StatelessWidget {
   const COLocumActivity({
     super.key,
+    this.jobId,
     this.clinicOwnerId,
     this.applications = const [],
     this.onApprove,
@@ -61,6 +62,7 @@ class COLocumActivity extends StatelessWidget {
   });
   // Retained for source compatibility. Live data always uses the authenticated
   // owner; supplied applications and action callbacks are not used.
+  final String? jobId;
   final String? clinicOwnerId;
   final List<COLocumApplication> applications;
 
@@ -109,7 +111,7 @@ class COLocumActivity extends StatelessWidget {
     child: Scaffold(
       backgroundColor: const Color(0xFFF2FAFE),
       appBar: AppBar(
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: jobId != null,
         title: const Text(
           'Locum Activity',
           style: TextStyle(fontWeight: FontWeight.w700),
@@ -154,9 +156,16 @@ class COLocumActivity extends StatelessWidget {
                   COLocumActivityStatus.current => 'hired',
                   COLocumActivityStatus.completed => 'completed',
                 };
-                final items = documents
-                    .where((doc) => doc.data()['status'] == storedStatus)
-                    .toList();
+                final items = documents.where((doc) {
+                  final data = doc.data();
+
+                  final matchesStatus = data['status'] == storedStatus;
+
+                  final matchesJob =
+                    jobId == null || data['jobId'] == jobId;
+
+                  return matchesStatus && matchesJob;
+                }).toList();
                 if (items.isEmpty) {
                   final message = switch (status) {
                     COLocumActivityStatus.pending =>
@@ -352,6 +361,82 @@ class _ApplicationCard extends StatelessWidget {
   const _ApplicationCard({required this.application});
   final COLocumApplication application;
 
+    Future<void> _updateApplicationStatus(
+      BuildContext context,
+      String newStatus,
+    ) async {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please sign in again.')),
+        );
+        return;
+      }
+
+      if (application.clinicOwnerId != user.uid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unauthorized action.')),
+        );
+        return;
+      }
+
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(
+            newStatus == 'hired'
+                ? 'Approve Application?'
+                : 'Reject Application?',
+          ),
+          content: Text(
+            newStatus == 'hired'
+                ? 'Are you sure you want to approve this locum?'
+                : 'Are you sure you want to reject this application?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true || !context.mounted) return;
+
+      try {
+        await FirebaseFirestore.instance
+            .collection('applications')
+            .doc(application.id)
+            .update({
+          'status': newStatus,
+        });
+
+        if (!context.mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              newStatus == 'hired'
+                  ? 'Application approved successfully!'
+                  : 'Application rejected successfully!',
+            ),
+          ),
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update application: $e')),
+        );
+      }
+    }
+
   void _showLocumDetails(BuildContext context) {
     final applicant = application;
 
@@ -460,7 +545,9 @@ class _ApplicationCard extends StatelessWidget {
       Color color,
       ValueChanged<COLocumApplication>? callback,
     ) => OutlinedButton.icon(
-      onPressed: null,
+      onPressed: callback == null
+    ? null
+    : () => callback(application),
       style: OutlinedButton.styleFrom(
         foregroundColor: color,
         side: BorderSide(
@@ -579,7 +666,12 @@ class _ApplicationCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: action('Reject', Icons.close, Colors.red, null),
+                      child: action(
+                        'Reject',
+                        Icons.close,
+                        Colors.red,
+                        (_) => _updateApplicationStatus(context, 'rejected'),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -587,7 +679,7 @@ class _ApplicationCard extends StatelessWidget {
                         'Approve',
                         Icons.check,
                         const Color(0xFF00A83B),
-                        null,
+                        (_) => _updateApplicationStatus(context, 'hired'),
                       ),
                     ),
                   ],
