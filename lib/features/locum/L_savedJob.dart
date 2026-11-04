@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../services/job_availability.dart';
+
 /// Temporary summary until the job posting service provides its full model.
 class SavedLocumJob {
   const SavedLocumJob({
@@ -70,9 +72,10 @@ class LocumSaveJobButton extends StatelessWidget {
 }
 
 class LSavedJob extends StatelessWidget {
-  const LSavedJob({super.key, required this.onBack});
+  const LSavedJob({super.key, required this.onBack, this.statusStream});
 
   final VoidCallback onBack;
+  final Stream<String> Function(String)? statusStream;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -106,10 +109,20 @@ class LSavedJob extends StatelessWidget {
               color: const Color(0xFFEBF6F4),
               elevation: 3,
               borderRadius: BorderRadius.circular(18),
-              child: ListTile(
-                title: Text(job.title),
-                subtitle: job.clinic.isEmpty ? null : Text(job.clinic),
-                trailing: LocumSaveJobButton(job: job),
+              child: JobAvailability(
+                jobId: job.id,
+                statusStream: statusStream?.call(job.id),
+                builder: (context, available, deleted) => ListTile(
+                  title: Text(job.title),
+                  subtitle: Text(
+                    [
+                      if (job.clinic.isNotEmpty) job.clinic,
+                      if (!available)
+                        deleted ? 'Deleted - unavailable' : 'Unavailable',
+                    ].join(' - '),
+                  ),
+                  trailing: LocumSaveJobButton(job: job),
+                ),
               ),
             );
           },

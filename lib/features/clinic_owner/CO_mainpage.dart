@@ -333,7 +333,9 @@ class _COMainPageState extends State<COMainPage> {
         .where(
           (job) => [
             job.role,
-            job.placeName,
+            job.status == 'deleted'
+                ? '${job.placeName} (Deleted)'
+                : job.placeName,
             job.location,
             job.description,
             job.contactPerson,

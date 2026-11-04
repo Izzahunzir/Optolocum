@@ -2,12 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'L_applyJobDialog.dart';
+import '../../services/job_availability.dart';
 
 class LJobDetails extends StatelessWidget {
   final String jobId;
+  final Stream<String>? statusStream;
   final Map<String, dynamic> job;
 
-  const LJobDetails({super.key, required this.jobId, required this.job});
+  const LJobDetails({
+    super.key,
+    required this.jobId,
+    required this.job,
+    this.statusStream,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -190,27 +197,35 @@ class LJobDetails extends StatelessWidget {
 
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        showApplyJobDialog(
-                          context: context,
-                          jobId: jobId,
-                          jobTitle: job['role'] ?? 'Optometrist',
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF248783),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: const Color(0xFF248783),
-                        disabledForegroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    child: JobAvailability(
+                      jobId: jobId,
+                      statusStream: statusStream,
+                      builder: (context, available, deleted) => ElevatedButton(
+                        onPressed: !available
+                            ? null
+                            : () => showApplyJobDialog(
+                                context: context,
+                                jobId: jobId,
+                                jobTitle: job['role'] ?? 'Optometrist',
+                              ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF248783),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: const Color(0xFF248783),
+                          disabledForegroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text(
-                        'Apply Now',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                        child: Text(
+                          available
+                              ? 'Apply Now'
+                              : deleted
+                              ? 'Posting deleted - unavailable'
+                              : 'Job unavailable',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
                       ),
                     ),
                   ),
