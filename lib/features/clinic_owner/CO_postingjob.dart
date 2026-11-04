@@ -27,6 +27,7 @@ class COJobPosting {
     required this.contactNumber,
     this.imageUrl,
     this.applicantCount = 0,
+    this.status = 'available',
   });
   final String placeName,
       location,
@@ -42,14 +43,13 @@ class COJobPosting {
   final String? imageUrl;
   final String? jobId;
   final int applicantCount;
+  final String status;
+  bool get isAvailable => status == 'available';
 }
 
 final coJobPostings = ValueNotifier<List<COJobPosting>>(const []);
 
-COJobPosting jobFromFirestore(
-  Map<String, dynamic> data, {
-  String? jobId,
-}) {
+COJobPosting jobFromFirestore(Map<String, dynamic> data, {String? jobId}) {
   TimeOfDay parseTime(String value) {
     final parts = value.split(':');
     return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
@@ -70,6 +70,7 @@ COJobPosting jobFromFirestore(
 
   return COJobPosting(
     jobId: jobId,
+    status: data['status'] is String ? data['status'] as String : 'unknown',
     createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     placeName: data['placeName'] as String,
     location: data['location'] as String,
@@ -265,7 +266,7 @@ class _COPostingJobState extends State<COPostingJob> {
                                   ),
                                   const SizedBox(width: 14),
                                   Text(
-                                    '${jobs.length}',
+                                    '${jobs.where((job) => job.isAvailable).length}',
                                     style: const TextStyle(fontSize: 20),
                                   ),
                                 ],
@@ -324,7 +325,7 @@ class _COPostingJobState extends State<COPostingJob> {
                     ] else ...[
                       const SizedBox(height: 22),
                       const Text(
-                        'Active Postings',
+                        'Posting History',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -421,13 +422,13 @@ class COPostedJobCard extends StatelessWidget {
       stream: job.jobId == null
           ? const Stream.empty()
           : FirebaseFirestore.instance
-              .collection('applications')
-              .where('jobId', isEqualTo: job.jobId)
-              .where(
-                'clinicOwnerId',
-                isEqualTo: FirebaseAuth.instance.currentUser!.uid,
-              )
-              .snapshots(),
+                .collection('applications')
+                .where('jobId', isEqualTo: job.jobId)
+                .where(
+                  'clinicOwnerId',
+                  isEqualTo: FirebaseAuth.instance.currentUser!.uid,
+                )
+                .snapshots(),
       builder: (context, snapshot) {
         final count = snapshot.data?.docs.length ?? 0;
 
@@ -479,7 +480,9 @@ class COPostedJobCard extends StatelessWidget {
                       const SizedBox(height: 8),
                       detail(
                         Icons.business_outlined,
-                        job.placeName,
+                        job.status == 'deleted'
+                            ? '${job.placeName} (Deleted)'
+                            : job.placeName,
                         centerVertically: true,
                       ),
                       const SizedBox(height: 6),
@@ -502,7 +505,8 @@ class COPostedJobCard extends StatelessWidget {
                   flex: 10,
                   child: detail(
                     Icons.calendar_today_outlined,
-                    MaterialLocalizations.of(context).formatMediumDate(job.date),
+                    MaterialLocalizations.of(context)
+                        .formatMediumDate(job.date),
                     caption: '(One day)',
                   ),
                 ),
