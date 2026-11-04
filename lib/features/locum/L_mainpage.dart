@@ -190,7 +190,13 @@ class _LMainPageState extends State<LMainPage> {
                                 child: CircularProgressIndicator(),
                               );
                             }
-                            final allJobs = snapshot.data!.docs;
+                            // Fail closed even if a supplied/cached source contains
+                            // historical postings. Re-evaluate on every snapshot.
+                            final allJobs = snapshot.data!.docs
+                                .where(
+                                  (doc) => doc.data()['status'] == 'available',
+                                )
+                                .toList();
                             _locations =
                                 allJobs
                                     .map(

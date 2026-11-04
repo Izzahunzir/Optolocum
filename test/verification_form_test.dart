@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:optolocum/features/clinic_owner/CO_verification_form.dart';
+import 'package:optolocum/services/verification_submission.dart';
 
 void main() {
   testWidgets(
@@ -56,9 +57,7 @@ void main() {
       await tester.tap(find.text('Verify Account'));
       await tester.pumpAndSettle();
       expect(
-        find.text(
-          'Your details are ready. Verification submission is coming soon.',
-        ),
+        find.text(DisabledVerificationSubmissions.message),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);

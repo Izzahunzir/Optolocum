@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import '../../services/locum_profile_service.dart';
+import '../../services/verification_submission.dart';
 
 import 'L_mainpage.dart';
 import 'L_profile_data.dart';
@@ -13,11 +14,17 @@ class LVerificationForm extends StatefulWidget {
     super.key,
     this.displayName = '',
     this.isEditing = false,
+    this.submissions = const DisabledVerificationSubmissions(),
+    this.profileService,
+    this.pickDocument,
   });
   final String displayName;
 
   // false: first-time verification; true: update from the Account tab.
   final bool isEditing;
+  final VerificationSubmissionClient submissions;
+  final LocumProfileService? profileService;
+  final Future<XFile?> Function()? pickDocument;
 
   @override
   State<LVerificationForm> createState() => _LVerificationFormState();
@@ -29,7 +36,8 @@ class _LVerificationFormState extends State<LVerificationForm> {
   bool _uploadStep = false;
   String? _documentError;
   late final Map<String, TextEditingController> _controllers;
-  final _service = LocumProfileService.instance;
+  late final _service = widget.profileService ?? LocumProfileService.instance;
+  VerificationSubmission? _attempt;
   StreamSubscription<dynamic>? _authSubscription;
   String? _uid;
   bool _loading = true;
@@ -109,46 +117,32 @@ class _LVerificationFormState extends State<LVerificationForm> {
 
   Future<void> _pickDocuments() async {
     try {
-      final files = await openFiles(
-        acceptedTypeGroups: [
-          const XTypeGroup(
-            label: 'Verification documents',
-            extensions: ['pdf', 'png', 'jpg', 'jpeg'],
-            mimeTypes: ['application/pdf', 'image/png', 'image/jpeg'],
-          ),
-        ],
-      );
-      final accepted = <XFile>[];
-      String? selectionError;
-      for (final file in files) {
-        if (await file.length() > 50 * 1024 * 1024) {
-          selectionError = '${file.name} exceeds 50 MB.';
-          continue;
-        }
-        if (![
-          'pdf',
-          'png',
-          'jpg',
-          'jpeg',
-        ].contains(file.name.split('.').last.toLowerCase())) {
-          continue;
-        }
-        accepted.add(file);
-      }
+      final file =
+          await (widget.pickDocument?.call() ??
+              openFile(
+                acceptedTypeGroups: [
+                  const XTypeGroup(
+                    label: 'Verification documents',
+                    extensions: ['pdf', 'png', 'jpg', 'jpeg'],
+                    mimeTypes: ['application/pdf', 'image/png', 'image/jpeg'],
+                  ),
+                ],
+              ));
+      if (file == null) return;
+      await VerificationDocument.fromFile(file);
       if (!mounted || _accountChanged || _service.currentUid != _uid) return;
       setState(() {
-        _documentError = selectionError;
-        _documents.addAll(
-          accepted.where(
-            (file) => !_documents.any((existing) => existing.path == file.path),
-          ),
-        );
+        _documentError = null;
+        _documents
+          ..clear()
+          ..add(file);
       });
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         setState(
-          () =>
-              _documentError = 'Could not select documents. Please try again.',
+          () => _documentError = error is FormatException
+              ? error.message
+              : 'Could not select document. Please try again.',
         );
       }
     }
@@ -162,24 +156,49 @@ class _LVerificationFormState extends State<LVerificationForm> {
     }
     final uid = _uid;
     if (uid == null || _service.currentUid != uid) return;
+    if (_documents.length != 1) {
+      setState(
+        () => _documentError = 'Choose exactly one PDF, JPG, JPEG, or PNG.',
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
-      await _service.save(
-        LocumProfileData(
-          uid: uid,
-          verificationStatus: 'pending',
-          fields: {
-            for (final entry in _controllers.entries)
-              entry.key: entry.value.text.trim(),
-          },
-          documents: _documents,
-        ),
+      final profile = LocumProfileData(
+        uid: uid,
+        verificationStatus: 'pending',
+        fields: {
+          for (final entry in _controllers.entries)
+            entry.key: entry.value.text.trim(),
+        },
+        documents: _documents,
       );
+      final candidate = VerificationSubmission(
+        uid: uid,
+        accountType: VerificationAccountType.locum,
+        fields: profile.toFirestore().cast<String, String>()
+          ..remove('verificationStatus'),
+        document: await VerificationDocument.fromFile(_documents.single),
+      );
+      if (_attempt?.fingerprint != candidate.fingerprint) _attempt = candidate;
+      final submissionsDisabled =
+          widget.submissions is DisabledVerificationSubmissions;
+      if (submissionsDisabled) {
+        // Preserve the existing profile-only workflow until deployment approval.
+        await _service.save(profile);
+      } else {
+        await widget.submissions.submit(
+          _attempt!,
+          saveProfile: () => _service.save(profile),
+        );
+      }
       if (!mounted || _accountChanged || _service.currentUid != uid) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Profile saved. Verification remains pending. Documents have not been uploaded or submitted for verification.',
+            submissionsDisabled
+                ? 'Profile saved. Your document has not been uploaded or submitted for verification.'
+                : 'Your details and document have been submitted for review.',
           ),
         ),
       );
@@ -192,11 +211,17 @@ class _LVerificationFormState extends State<LVerificationForm> {
           MaterialPageRoute<void>(builder: (_) => const LMainPage()),
         );
       }
-    } catch (_) {
+    } catch (error) {
       if (!mounted || _accountChanged) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to save profile. Please try again.'),
+        SnackBar(
+          content: Text(
+            error is StateError
+                ? error.message.toString()
+                : error is FormatException
+                ? error.message
+                : 'Unable to submit verification. Your progress is retained; please retry.',
+          ),
         ),
       );
     } finally {
@@ -375,9 +400,14 @@ class _LVerificationFormState extends State<LVerificationForm> {
                         ),
                       ),
                       if (_uploadStep) ...[
-                        const Text(
-                          'Files are local previews only and have not been uploaded. Saving your profile does not submit documents for verification.',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        Text(
+                          widget.submissions is DisabledVerificationSubmissions
+                              ? 'Choose one document for private review. Submission is currently unavailable until verification is enabled.'
+                              : 'Choose one document to submit privately for Admin review.',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
                         ),
                         const SizedBox(height: 20),
                         OutlinedButton(
@@ -395,9 +425,9 @@ class _LVerificationFormState extends State<LVerificationForm> {
                                 size: 54,
                                 color: Color(0xFFDDDFDF),
                               ),
-                              Text('Choose a file or documents'),
+                              Text('Choose one document'),
                               Text(
-                                'PNG, JPG and PDF up to 50 MB',
+                                'PNG, JPG, JPEG or PDF up to 50 MB',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: Colors.grey,

@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../services/verification_submission.dart';
 
 class COVerificationForm extends StatefulWidget {
-  const COVerificationForm({super.key});
+  const COVerificationForm({
+    super.key,
+    this.submissions = const DisabledVerificationSubmissions(),
+    this.currentUid,
+  });
+  final VerificationSubmissionClient submissions;
+  final String? Function()? currentUid;
 
   static const practiceTypes = [
     'Hospital',
@@ -32,6 +41,33 @@ class COVerificationForm extends StatefulWidget {
 class _COVerificationFormState extends State<COVerificationForm> {
   static const _blue = Color(0xFF3B4E89);
   final _formKey = GlobalKey<FormState>();
+  final _values = <String, String>{};
+  bool _saving = false;
+  VerificationSubmission? _attempt;
+  String? _initialUid;
+
+  String? _currentUid() => widget.currentUid != null
+      ? widget.currentUid!()
+      : FirebaseAuth.instance.currentUser?.uid;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.submissions is! DisabledVerificationSubmissions) {
+      _initialUid = _currentUid();
+    }
+  }
+
+  static const _keys = {
+    'Type of Practice': 'practiceType',
+    'Clinic Name': 'clinicName',
+    'Clinic Registration Number/ CSSM/ Business Registration':
+        'registrationNumber',
+    'Clinic Address': 'address',
+    'State': 'state',
+    'Clinic Contact Number': 'contactNumber',
+    'Email (Company)': 'companyEmail',
+  };
 
   InputDecoration _decoration(String hint) => InputDecoration(
     hintText: hint,
@@ -75,6 +111,8 @@ class _COVerificationFormState extends State<COVerificationForm> {
   }) => _label(
     label,
     TextFormField(
+      onSaved: (value) => _values[_keys[label]!] = (value ?? '').trim(),
+      enabled: !_saving,
       decoration: _decoration(hint),
       style: const TextStyle(fontSize: 14),
       keyboardType: keyboardType,
@@ -123,24 +161,66 @@ class _COVerificationFormState extends State<COVerificationForm> {
             ),
           )
           .toList(),
-      onChanged: (_) {},
+      onChanged: _saving ? null : (_) {},
+      onSaved: (value) => _values[_keys[label]!] = value ?? '',
       validator: (value) =>
           value == null ? 'Select ${label.toLowerCase()}' : null,
     ),
   );
 
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _submit() async {
+    if (_saving || !_formKey.currentState!.validate()) return;
+    _formKey.currentState!.save();
     FocusScope.of(context).unfocus();
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Your details are ready. Verification submission is coming soon.',
-          ),
-        ),
+    setState(() => _saving = true);
+    try {
+      // Do not even initialize Firebase when the production gate is closed.
+      if (widget.submissions is DisabledVerificationSubmissions) {
+        throw StateError(DisabledVerificationSubmissions.message);
+      }
+      final uid = _currentUid();
+      if (uid == null) throw StateError('Please sign in before submitting.');
+      if (uid != _initialUid) {
+        throw StateError('Your account changed. Please reopen the form.');
+      }
+      final candidate = VerificationSubmission(
+        uid: uid,
+        accountType: VerificationAccountType.practiceOwner,
+        fields: _values,
       );
+      if (_attempt?.fingerprint != candidate.fingerprint) _attempt = candidate;
+      await widget.submissions.submit(_attempt!);
+      if (!mounted) return;
+      if (_currentUid() != uid) {
+        throw StateError('Your account changed. Please reopen the form.');
+      }
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Your practice details have been submitted for review.',
+            ),
+          ),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              error is StateError
+                  ? error.message.toString()
+                  : error is FormatException
+                  ? error.message
+                  : 'Unable to submit practice details. Please retry.',
+            ),
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -263,7 +343,7 @@ class _COVerificationFormState extends State<COVerificationForm> {
                     ),
                     const SizedBox(height: 28),
                     ElevatedButton(
-                      onPressed: _submit,
+                      onPressed: _saving ? null : _submit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _blue,
                         foregroundColor: Colors.white,

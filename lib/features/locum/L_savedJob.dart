@@ -118,7 +118,7 @@ class LSavedJob extends StatelessWidget {
                     [
                       if (job.clinic.isNotEmpty) job.clinic,
                       if (!available)
-                        deleted ? 'Deleted - unavailable' : 'Unavailable',
+                        deleted ? 'No longer available' : 'Unavailable',
                     ].join(' - '),
                   ),
                   trailing: LocumSaveJobButton(job: job),
