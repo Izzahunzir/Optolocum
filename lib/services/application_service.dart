@@ -59,8 +59,12 @@ class ApplicantSummary {
 }
 
 class ApplicationService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  ApplicationService({FirebaseFirestore? firestore, FirebaseAuth? auth})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _auth = auth ?? FirebaseAuth.instance;
+
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
 
   /// Read only the Locum-published, application-scoped summary. Private
   /// locum_profiles documents are never requested by clinic-owner pages.
@@ -172,7 +176,7 @@ class ApplicationService {
 
     final jobRef = _firestore.collection('job_postings').doc(jobId);
 
-    await _firestore.runTransaction((transaction) async {
+    await _firestore.runTransaction<void>((transaction) async {
       final jobSnapshot = await transaction.get(jobRef);
       final applicationSnapshot = await transaction.get(applicationRef);
 

@@ -1,0 +1,27 @@
+// DRAFT: private evidence only. No public URLs or client deletion/overwrite.
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+    function admin() { return request.auth != null && request.auth.token.get('admin', false) == true; }
+    function revision(uid, id) {
+      return firestore.get(/databases/(default)/documents/verification_submissions/$(uid)/revisions/$(id)).data;
+    }
+    match /verification_documents/{uid}/{id}/document {
+      allow get: if (owner(uid) || admin())
+        && revision(uid,id).accountType == 'locum';
+      allow create: if resource == null && owner(uid) && id.matches('^[a-f0-9]{40}$')
+        && revision(uid,id).uid == uid && revision(uid,id).accountType == 'locum'
+        && revision(uid,id).state == 'draft'
+        && revision(uid,id).document.path == 'verification_documents/' + uid + '/' + id + '/document'
+        && request.resource.size > 0 && request.resource.size <= 50 * 1024 * 1024
+        && request.resource.size == revision(uid,id).document.size
+        && request.resource.contentType in ['application/pdf','image/png','image/jpeg']
+        && request.resource.contentType == revision(uid,id).document.contentType
+        && request.resource.metadata.keys().hasOnly(['sha256'])
+        && request.resource.metadata.sha256 == revision(uid,id).document.sha256;
+      allow list, update, delete: if false;
+    }
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}

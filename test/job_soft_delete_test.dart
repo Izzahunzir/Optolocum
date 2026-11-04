@@ -71,6 +71,8 @@ void main() {
   testWidgets('deleted saved job remains a clearly unavailable bookmark', (
     tester,
   ) async {
+    final statuses = StreamController<String>();
+    addTearDown(statuses.close);
     locumSavedJobs.save(
       const SavedLocumJob(id: 'synthetic-job', title: 'Historical role'),
     );
@@ -79,13 +81,19 @@ void main() {
       MaterialApp(
         home: LSavedJob(
           onBack: () {},
-          statusStream: (_) => Stream.value('deleted'),
+          statusStream: (_) => statuses.stream,
         ),
       ),
     );
+    statuses.add('available');
+    await tester.pumpAndSettle();
+    expect(find.text('No longer available'), findsNothing);
+    statuses.add('deleted');
     await tester.pumpAndSettle();
     expect(find.text('Historical role'), findsOneWidget);
-    expect(find.text('Deleted - unavailable'), findsOneWidget);
+    expect(find.text('No longer available'), findsOneWidget);
+    expect(locumSavedJobs.contains('synthetic-job'), isTrue);
+    expect(find.text('Apply Now'), findsNothing);
   });
   testWidgets('availability errors fail closed', (tester) async {
     await tester.pumpWidget(
