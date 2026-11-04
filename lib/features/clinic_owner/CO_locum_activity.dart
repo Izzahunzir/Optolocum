@@ -30,6 +30,7 @@ class COLocumApplication {
     this.rating,
     this.reviewCount = 0,
     this.avatarUrl,
+    this.isRejected = false,
   });
   final String id,
       jobId,
@@ -48,6 +49,7 @@ class COLocumApplication {
   final double? rating;
   final int reviewCount;
   final String? avatarUrl;
+  final bool isRejected;
 }
 
 class COLocumActivity extends StatelessWidget {
@@ -159,7 +161,10 @@ class COLocumActivity extends StatelessWidget {
                 final items = documents.where((doc) {
                   final data = doc.data();
 
-                  final matchesStatus = data['status'] == storedStatus;
+                final matchesStatus =
+                  data['status'] == storedStatus ||
+                  (status == COLocumActivityStatus.completed &&
+                    data['status'] == 'rejected');
 
                   final matchesJob =
                     jobId == null || data['jobId'] == jobId;
@@ -314,6 +319,45 @@ class _FirestoreApplicationCard extends StatelessWidget {
     );
   }
 
+          bool _hasJobEnded(Map<String, dynamic>? job) {
+            if (job == null) return false;
+
+            final jobDate = job['jobDate'];
+            final endTime = job['endTime'];
+
+            if (jobDate is! Timestamp || endTime is! String) {
+              return false;
+            }
+
+            final parts = endTime.split(':');
+
+            if (parts.length != 2) return false;
+
+            final hour = int.tryParse(parts[0]);
+            final minute = int.tryParse(parts[1]);
+
+            if (hour == null ||
+                minute == null ||
+                hour < 0 ||
+                hour > 23 ||
+                minute < 0 ||
+                minute > 59) {
+                return false;
+              }
+
+              final date = jobDate.toDate();
+
+              final jobEndDateTime = DateTime(
+                  date.year,
+                  date.month,
+                  date.day,
+                  hour,
+                  minute,
+                );
+
+                return !DateTime.now().isBefore(jobEndDateTime);
+                }
+
   Widget _applicantCard(
     BuildContext context,
     Map<String, dynamic> data,
@@ -329,12 +373,14 @@ class _FirestoreApplicationCard extends StatelessWidget {
     final start = _text(job?['startTime'], '');
     final end = _text(job?['endTime'], '');
     return _ApplicationCard(
+      hasJobEnded: _hasJobEnded(job),
       application: COLocumApplication(
         id: document.id,
         jobId: _text(data['jobId'], ''),
         clinicOwnerId: _text(data['clinicOwnerId'], ''),
         locumId: _text(data['locumId'], ''),
         status: status,
+        isRejected: data['status'] == 'rejected',
         appliedAt: appliedAt is Timestamp ? appliedAt.toDate() : null,
         timestamp: appliedAt is Timestamp
             ? 'Applied on ${localizations.formatMediumDate(appliedAt.toDate())}'
@@ -358,8 +404,13 @@ class _FirestoreApplicationCard extends StatelessWidget {
 }
 
 class _ApplicationCard extends StatelessWidget {
-  const _ApplicationCard({required this.application});
+  const _ApplicationCard({
+    required this.application,
+    required this.hasJobEnded,
+  });
+
   final COLocumApplication application;
+  final bool hasJobEnded;
 
     Future<void> _updateApplicationStatus(
       BuildContext context,
@@ -627,7 +678,58 @@ class _ApplicationCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 3),
-                        if (applicant.rating != null)
+
+                        // Rejected application status
+                        if (applicant.isRejected) ...[
+                           const SizedBox(height: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              'Rejected',
+                              style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                      ],
+
+                        //Completed application status
+
+                        if (applicant.status == COLocumActivityStatus.completed &&
+                            !applicant.isRejected) ...[
+                          const SizedBox(height: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              'Completed',
+                              style: TextStyle(
+                                color: Colors.green.shade700,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                      ],
+
+                      if (applicant.rating != null)
                           Row(
                             children: [
                               const Icon(
