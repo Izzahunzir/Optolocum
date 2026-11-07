@@ -18,6 +18,7 @@ class COJobPosting {
     required this.placeName,
     required this.location,
     required this.role,
+    this.vacancies = 1,
     required this.date,
     required this.start,
     required this.end,
@@ -44,6 +45,7 @@ class COJobPosting {
   final String? imageUrl;
   final String? jobId;
   final int applicantCount;
+  final int vacancies;
   final String status;
   bool get isAvailable => status == 'available';
 }
@@ -76,6 +78,7 @@ COJobPosting jobFromFirestore(Map<String, dynamic> data, {String? jobId}) {
     placeName: data['placeName'] as String,
     location: data['location'] as String,
     role: data['role'] as String,
+    vacancies: (data['vacancies'] as num?)?.toInt() ?? 1,
     date: (data['jobDate'] as Timestamp).toDate(),
     start: parseTime(data['startTime'] as String),
     end: parseTime(data['endTime'] as String),
@@ -125,6 +128,7 @@ class _COPostingJobState extends State<COPostingJob> {
         placeName: posting.placeName,
         location: posting.location,
         role: posting.role,
+        vacancies: posting.vacancies,
         jobDate: posting.date,
         startTime: formatTime(posting.start),
         endTime: formatTime(posting.end),
@@ -675,6 +679,15 @@ class _PostingFormState extends State<_PostingForm> {
             return 'Enter a positive rate';
           }
         }
+
+        if (name == 'Number of Vacancies') {
+          final vacancies = int.tryParse(value!.trim());
+
+        if (vacancies == null || vacancies < 1) {
+          return 'Enter a valid number of vacancies';
+        }
+      }
+
         if (name == 'Contact Number' &&
             !RegExp(r'^\+?[0-9]{7,15}$')
                 .hasMatch(value!.replaceAll(RegExp(r'[\s()-]'), ''))) {
@@ -740,6 +753,7 @@ class _PostingFormState extends State<_PostingForm> {
         placeName: _values['Place Name']!,
         location: _values['Location']!,
         role: _values['Role']!,
+        vacancies: int.parse(_values['Number of Vacancies']!),
         date: _date!,
         start: _start!,
         end: _end!,
@@ -794,6 +808,11 @@ class _PostingFormState extends State<_PostingForm> {
               field('Location', icon: Icons.location_on_outlined),
               section('2. Job Details'),
               field('Role'),
+              field(
+                'Number of Vacancies',
+                icon: Icons.groups_outlined,
+                type: TextInputType.number,
+              ),
               label(
                 'Date',
                 TextFormField(
