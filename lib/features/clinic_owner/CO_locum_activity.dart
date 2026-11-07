@@ -420,7 +420,7 @@ class _ApplicationCard extends StatelessWidget {
 
       if (user == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please sign in again.')),
+        const SnackBar(content: Text('Please sign in again.')),
         );
         return;
       }
@@ -432,18 +432,101 @@ class _ApplicationCard extends StatelessWidget {
         return;
       }
 
+      // Validate job end time before marking as completed
+      if (newStatus == 'completed') {
+        try {
+          final jobSnapshot = await FirebaseFirestore.instance
+              .collection('job_postings')
+              .doc(application.jobId)
+              .get();
+
+          if (!context.mounted) return;
+
+          final job = jobSnapshot.data();
+
+          if (job == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Job information unavailable.'),
+              ),
+            );
+            return;
+          }
+
+          final jobDate = job['jobDate'];
+          final endTime = job['endTime'];
+
+          if (jobDate is! Timestamp || endTime is! String) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Invalid job schedule.'),
+              ),
+            );
+            return;
+          }
+
+          final parts = endTime.split(':');
+
+          if (parts.length != 2) return;
+
+          final hour = int.tryParse(parts[0]);
+          final minute = int.tryParse(parts[1]);
+
+          if (hour == null ||
+              minute == null ||
+              hour < 0 ||
+              hour > 23 ||
+              minute < 0 ||
+              minute > 59) {
+            return;
+          }
+
+          final date = jobDate.toDate();
+
+          final jobEnd = DateTime(
+            date.year,
+            date.month,
+            date.day,
+            hour,
+            minute,
+          );
+
+          if (DateTime.now().isBefore(jobEnd)) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('This job has not ended yet.'),
+              ),
+            );
+            return;
+          }
+        } catch (e) {
+          if (!context.mounted) return;
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Unable to verify job end time: $e'),
+            ),
+          );
+          return;
+        }
+      }
+      
       final confirm = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: Text(
             newStatus == 'hired'
                 ? 'Approve Application?'
-                : 'Reject Application?',
+                : newStatus == 'completed'
+                    ? 'Mark Job as Completed?'
+                    : 'Reject Application?',
           ),
           content: Text(
             newStatus == 'hired'
                 ? 'Are you sure you want to approve this locum?'
-                : 'Are you sure you want to reject this application?',
+                : newStatus == 'completed'
+                    ? 'Has this locum successfully completed the job?'
+                    : 'Are you sure you want to reject this application?',
           ),
           actions: [
             TextButton(
@@ -475,10 +558,12 @@ class _ApplicationCard extends StatelessWidget {
             content: Text(
               newStatus == 'hired'
                   ? 'Application approved successfully!'
-                  : 'Application rejected successfully!',
+                  : newStatus == 'completed'
+                      ? 'Job marked as completed successfully!'
+                      : 'Application rejected successfully!',
             ),
           ),
-        );
+        );  
       } catch (e) {
         if (!context.mounted) return;
 
@@ -569,131 +654,154 @@ class _ApplicationCard extends StatelessWidget {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final applicant = application;
-    Widget detail(IconData icon, String label, String value) => Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 19, color: Colors.grey),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 66,
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF777777)),
+  
+@override
+Widget build(BuildContext context) {
+  final applicant = application;
+
+  Widget detail(IconData icon, String label, String value) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 19, color: Colors.grey),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 66,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF777777),
             ),
           ),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
-        ],
-      ),
-    );
-    Widget action(
-      String label,
-      IconData icon,
-      Color color,
-      ValueChanged<COLocumApplication>? callback,
-    ) => OutlinedButton.icon(
-      onPressed: callback == null
-    ? null
-    : () => callback(application),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: color,
-        side: BorderSide(
-          color: callback == null ? Colors.grey.shade300 : color,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 13),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget action(
+    String label,
+    IconData icon,
+    Color color,
+    ValueChanged<COLocumApplication>? callback,
+  ) => OutlinedButton.icon(
+    onPressed: callback == null
+        ? null
+        : () => callback(application),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: color,
+      side: BorderSide(
+        color: callback == null ? Colors.grey.shade300 : color,
       ),
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-    );
-    return InkWell(
-      onTap: () => _showLocumDetails(context),
-      borderRadius: BorderRadius.circular(5),
-      child: Card(
-        color: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (applicant.timestamp.isNotEmpty)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    applicant.timestamp,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF666666),
-                    ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(5),
+      ),
+    ),
+    icon: Icon(icon, size: 18),
+    label: Text(label),
+  );
+
+  return InkWell(
+    onTap: () => _showLocumDetails(context),
+    borderRadius: BorderRadius.circular(5),
+    child: Card(
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (applicant.timestamp.isNotEmpty)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  applicant.timestamp,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF666666),
                   ),
                 ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  SizedBox(
-                    width: 52,
-                    height: 52,
-                    child: ClipOval(
-                      child: applicant.avatarUrl == null
-                          ? const ColoredBox(
-                              color: Color(0xFFECEDF6),
-                              child: Icon(
-                                Icons.person,
-                                size: 36,
-                                color: Color(0xFF263C80),
-                              ),
-                            )
-                          : Image.network(
-                              applicant.avatarUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, error, stack) =>
-                                  const Icon(Icons.person, size: 36),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          applicant.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          applicant.qualification,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF666666),
-                          ),
-                        ),
-                        const SizedBox(height: 3),
+              ),
 
-                        // Rejected application status
-                        if (applicant.isRejected) ...[
-                           const SizedBox(height: 5),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
+            const SizedBox(height: 8),
+
+            Row(
+              children: [
+                SizedBox(
+                  width: 52,
+                  height: 52,
+                  child: ClipOval(
+                    child: applicant.avatarUrl == null
+                        ? const ColoredBox(
+                            color: Color(0xFFECEDF6),
+                            child: Icon(
+                              Icons.person,
+                              size: 36,
+                              color: Color(0xFF263C80),
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: Text(
-                              'Rejected',
-                              style: TextStyle(
+                          )
+                        : Image.network(
+                            applicant.avatarUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, error, stack) =>
+                                const Icon(Icons.person, size: 36),
+                          ),
+                  ),
+                ),
+
+                const SizedBox(width: 14),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        applicant.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+
+                      const SizedBox(height: 3),
+
+                      Text(
+                        applicant.qualification,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF666666),
+                        ),
+                      ),
+
+                      const SizedBox(height: 3),
+
+                      // Rejected application status
+                      if (applicant.isRejected) ...[
+                        const SizedBox(height: 5),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            'Rejected',
+                            style: TextStyle(
                               color: Colors.red.shade700,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -703,26 +811,26 @@ class _ApplicationCard extends StatelessWidget {
                         const SizedBox(height: 5),
                       ],
 
-                        //Completed application status
-
-                        if (applicant.status == COLocumActivityStatus.completed &&
-                            !applicant.isRejected) ...[
-                          const SizedBox(height: 5),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
+                      // Completed application status
+                      if (applicant.status ==
+                              COLocumActivityStatus.completed &&
+                          !applicant.isRejected) ...[
+                        const SizedBox(height: 5),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
                             color: Colors.green.shade50,
                             borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: Text(
-                              'Completed',
-                              style: TextStyle(
-                                color: Colors.green.shade700,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                          ),
+                          child: Text(
+                            'Completed',
+                            style: TextStyle(
+                              color: Colors.green.shade700,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
@@ -730,73 +838,137 @@ class _ApplicationCard extends StatelessWidget {
                       ],
 
                       if (applicant.rating != null)
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.star,
-                                size: 15,
-                                color: Color(0xFFFFBC00),
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  '${applicant.rating!.toStringAsFixed(1)} (${applicant.reviewCount} reviews)',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF666666),
-                                  ),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.star,
+                              size: 15,
+                              color: Color(0xFFFFBC00),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                '${applicant.rating!.toStringAsFixed(1)} (${applicant.reviewCount} reviews)',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF666666),
                                 ),
                               ),
-                            ],
-                          ),
-                      ],
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 28),
+
+            detail(
+              Icons.calendar_today_outlined,
+              'Job Date',
+              applicant.jobDate,
+            ),
+            detail(Icons.access_time, 'Time', applicant.time),
+            detail(
+              Icons.location_on_outlined,
+              'Location',
+              applicant.location,
+            ),
+            detail(
+              Icons.description_outlined,
+              'Position',
+              applicant.position,
+            ),
+
+            const SizedBox(height: 8),
+
+            // Pending: Approve / Reject
+            if (applicant.status == COLocumActivityStatus.pending)
+              Row(
+                children: [
+                  Expanded(
+                    child: action(
+                      'Reject',
+                      Icons.close,
+                      Colors.red,
+                      (_) => _updateApplicationStatus(
+                        context,
+                        'rejected',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: action(
+                      'Approve',
+                      Icons.check,
+                      const Color(0xFF00A83B),
+                      (_) => _updateApplicationStatus(
+                        context,
+                        'hired',
+                      ),
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 28),
-              detail(
-                Icons.calendar_today_outlined,
-                'Job Date',
-                applicant.jobDate,
-              ),
-              detail(Icons.access_time, 'Time', applicant.time),
-              detail(Icons.location_on_outlined, 'Location', applicant.location),
-              detail(Icons.description_outlined, 'Position', applicant.position),
-              const SizedBox(height: 8),
-              if (applicant.status == COLocumActivityStatus.pending)
-                Row(
-                  children: [
-                    Expanded(
-                      child: action(
-                        'Reject',
-                        Icons.close,
-                        Colors.red,
-                        (_) => _updateApplicationStatus(context, 'rejected'),
+              )
+
+            // Current: Mark as Completed
+            else if (applicant.status ==
+                COLocumActivityStatus.current)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: hasJobEnded
+                        ? () => _updateApplicationStatus(
+                              context,
+                              'completed',
+                            )
+                        : null,
+                    icon: const Icon(Icons.task_alt),
+                    label: const Text('Mark as Completed'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF00A83B),
+                      side: BorderSide(
+                        color: hasJobEnded
+                            ? const Color(0xFF00A83B)
+                            : Colors.grey.shade300,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(5),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: action(
-                        'Approve',
-                        Icons.check,
-                        const Color(0xFF00A83B),
-                        (_) => _updateApplicationStatus(context, 'hired'),
+                  ),
+
+                  if (!hasJobEnded)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: Text(
+                        'Available after the job end time.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
-                  ],
-                )
-              else
-                action(
-                  'Message',
-                  Icons.chat_bubble_outline,
-                  const Color(0xFF263C80),
-                  null,
-                ),
-            ],
-          ),
+                ],
+              )
+
+            // Completed / Rejected
+            else
+              action(
+                'Message',
+                Icons.chat_bubble_outline,
+                const Color(0xFF263C80),
+                null,
+              ),
+          ],
         ),
-        ),
-    );
-  }
+      ),
+    ),
+  );
+}
 }
