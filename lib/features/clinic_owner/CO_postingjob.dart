@@ -8,6 +8,7 @@ import 'dart:async';
 import 'CO_navigation.dart';
 import 'CO_mainpage.dart';
 import 'CO_profile.dart';
+import 'CO_locum_activity.dart';
 
 class COJobPosting {
   const COJobPosting({
@@ -16,6 +17,7 @@ class COJobPosting {
     required this.placeName,
     required this.location,
     required this.role,
+    this.vacancies = 1,
     required this.date,
     required this.start,
     required this.end,
@@ -42,6 +44,7 @@ class COJobPosting {
   final String? imageUrl;
   final String? jobId;
   final int applicantCount;
+  final int vacancies;
   final String status;
   bool get isAvailable => status == 'available';
 }
@@ -72,6 +75,7 @@ COJobPosting jobFromFirestore(Map<String, dynamic> data, {String? jobId}) {
     placeName: data['placeName'] as String,
     location: data['location'] as String,
     role: data['role'] as String,
+    vacancies: (data['vacancies'] as num?)?.toInt() ?? 1,
     date: (data['jobDate'] as Timestamp).toDate(),
     start: parseTime(data['startTime'] as String),
     end: parseTime(data['endTime'] as String),
@@ -416,26 +420,52 @@ class COPostedJobCard extends StatelessWidget {
       builder: (context, snapshot) {
         final count = snapshot.data?.docs.length ?? 0;
 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF263C80),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.groups_outlined, size: 25, color: Colors.white),
-              const SizedBox(width: 6),
-              Text(
-                '$count locum applied',
-                style: const TextStyle(fontSize: 12, color: Colors.white),
-              ),
-            ],
+        return InkWell(
+          onTap: job.jobId == null
+              ? null
+              : () {
+                  Navigator.push(
+                    context,
+                  MaterialPageRoute<void>(
+                      builder: (_) => COLocumActivity(
+                        jobId: job.jobId,
+                    ),
+                  ),
+                );
+              },
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xFF263C80),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.groups_outlined,
+                  size: 25,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '$count locum applied',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
     );
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       color: const Color(0xFFDDF0FF),
@@ -636,6 +666,15 @@ class _PostingFormState extends State<_PostingForm> {
             return 'Enter a positive rate';
           }
         }
+
+        if (name == 'Number of Vacancies') {
+          final vacancies = int.tryParse(value!.trim());
+
+        if (vacancies == null || vacancies < 1) {
+          return 'Enter a valid number of vacancies';
+        }
+      }
+
         if (name == 'Contact Number' &&
             !RegExp(r'^\+?[0-9]{7,15}$')
                 .hasMatch(value!.replaceAll(RegExp(r'[\s()-]'), ''))) {
@@ -785,6 +824,11 @@ class _PostingFormState extends State<_PostingForm> {
               field('Location', icon: Icons.location_on_outlined),
               section('2. Job Details'),
               field('Role'),
+              field(
+                'Number of Vacancies',
+                icon: Icons.groups_outlined,
+                type: TextInputType.number,
+              ),
               label(
                 'Date',
                 TextFormField(
