@@ -18,13 +18,14 @@ const storage = (uid, claims = {}) => env.authenticatedContext(uid, claims).stor
 const revision = (database, uid = 'locum', revisionId = id) => doc(database, `verification_submissions/${uid}/revisions/${revisionId}`);
 const draft = (uid = 'locum', revisionId = id) => ({
   uid, accountType: uid === 'locum' ? 'locum' : 'practice_owner', schemaVersion: 1,
-  fields: uid === 'locum' ? personal : practice, fingerprint: hash,
+  submittedFields: uid === 'locum' ? personal : practice, verificationStatus: 'pending', fingerprint: hash,
   state: 'draft', createdAt: serverTimestamp(),
-  ...(uid === 'locum' ? { document: { path: `verification_documents/${uid}/${revisionId}/document`, name: 'evidence.pdf', contentType: 'application/pdf', size: bytes.length, sha256: hash } } : {}),
+  updatedAt: serverTimestamp(),
+  document: { path: `verification_documents/${uid}/${revisionId}/document`, name: 'evidence.pdf', contentType: 'application/pdf', size: bytes.length, sha256: hash },
 });
 const metadata = { contentType: 'application/pdf', customMetadata: { sha256: hash } };
 const create = async (uid = 'locum', revisionId = id) => setDoc(revision(db(uid), uid, revisionId), draft(uid, revisionId));
-const submit = async (uid = 'locum') => updateDoc(revision(db(uid), uid), { state: 'submitted', submittedAt: serverTimestamp() });
+const submit = async (uid = 'locum', revisionId = id) => updateDoc(revision(db(uid), uid, revisionId), { state: 'submitted', submittedAt: serverTimestamp(), updatedAt: serverTimestamp() });
 
 before(async () => {
   // Refuse execution without the exact isolated emulator endpoints.
@@ -56,15 +57,16 @@ test('Locum draft, private upload and immutable submitted revision', async () =>
   await assertSucceeds(submit());
   const saved = await getDoc(revision(db('locum')));
   assert.equal(saved.data().state, 'submitted');
-  await assertFails(updateDoc(revision(db('locum')), { 'fields.fullName': 'Changed' }));
+  await assertFails(updateDoc(revision(db('locum')), { 'submittedFields.fullName': 'Changed' }));
   await assertFails(updateDoc(revision(db('locum')), { submittedAt: serverTimestamp() }));
   await assertFails(deleteDoc(revision(db('locum'))));
 });
-test('Practice Owner submits details without document; resubmission creates a new revision', async () => {
+test('Practice Owner submits details and private document; resubmission creates a new revision', async () => {
   await assertSucceeds(create('owner'));
+  await assertSucceeds(uploadBytes(ref(storage('owner'), `verification_documents/owner/${id}/document`), bytes, metadata));
   await assertSucceeds(submit('owner'));
   await assertSucceeds(create('owner', secondId));
-  await assertSucceeds(updateDoc(revision(db('owner'), 'owner', secondId), {state:'submitted', submittedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(revision(db('owner'), 'owner', secondId), {state:'submitted', submittedAt:serverTimestamp(), updatedAt:serverTimestamp()}));
   assert.equal((await getDocs(collection(db('owner'), 'verification_submissions/owner/revisions'))).size, 2);
 });
 test('users cannot read/list/write another user submission; anonymous denied', async () => {
@@ -82,22 +84,22 @@ test('Admin reads evidence but cannot edit submissions or approve via client SDK
 });
 for (const field of ['verified', 'verificationStatus', 'reviewedBy', 'reviewedAt', 'decision', 'role', 'admin']) {
   test(`forged ${field} rejected on create and submit`, async () => {
-    await assertFails(setDoc(revision(db('locum')), { ...draft(), [field]: field === 'admin' ? true : 'verified' }));
+  await assertFails(setDoc(revision(db('locum')), { ...draft(), [field]: field === 'admin' ? true : 'verified' }));
     await create();
-    await assertFails(updateDoc(revision(db('locum')), {state:'submitted', submittedAt:serverTimestamp(), [field]:'forged'}));
+    await assertFails(updateDoc(revision(db('locum')), {state:'submitted', submittedAt:serverTimestamp(), updatedAt:serverTimestamp(), [field]:'forged'}));
   });
 }
 test('draft payload and document cannot be changed during finalization', async () => {
   await create();
-  for (const patch of [{'fields.nric':'111111111111'}, {'document.path':'other'}, {accountType:'practice_owner'}, {fingerprint:'d'.repeat(64)}, {createdAt:serverTimestamp()}]) {
-    await assertFails(updateDoc(revision(db('locum')), {state:'submitted', submittedAt:serverTimestamp(), ...patch}));
+  for (const patch of [{'submittedFields.nric':'111111111111'}, {'document.path':'other'}, {accountType:'practice_owner'}, {fingerprint:'d'.repeat(64)}, {createdAt:serverTimestamp()}]) {
+    await assertFails(updateDoc(revision(db('locum')), {state:'submitted', submittedAt:serverTimestamp(), updatedAt:serverTimestamp(), ...patch}));
   }
 });
 test('invalid fields, schema, UID, timestamps, and document metadata rejected', async () => {
   for (const patch of [
     {uid:'other'}, {schemaVersion:2}, {state:'submitted', submittedAt:serverTimestamp()},
-    {createdAt:Timestamp.fromMillis(1)}, {fields:{...personal, trustedRole:'admin'}},
-    {fields:{...personal, nric:'bad'}}, {fields:{...personal, email:'bad'}},
+    {createdAt:Timestamp.fromMillis(1)}, {submittedFields:{...personal, trustedRole:'admin'}},
+    {submittedFields:{...personal, nric:'bad'}}, {submittedFields:{...personal, email:'bad'}},
     {document:{...draft().document, size:0}}, {document:{...draft().document, size:52428801}},
     {document:{...draft().document, path:'public/document'}},
     {document:{...draft().document, contentType:'text/html'}},
@@ -105,11 +107,11 @@ test('invalid fields, schema, UID, timestamps, and document metadata rejected', 
   ]) await assertFails(setDoc(revision(db('locum')), {...draft(), ...patch}));
   const noDoc = draft(); delete noDoc.document;
   await assertFails(setDoc(revision(db('locum')), noDoc));
-  await assertFails(setDoc(revision(db('owner'), 'owner'), {...draft('owner'), document:draft().document}));
+  await assertFails(setDoc(revision(db('owner'), 'owner'), {...draft('owner'), document:{...draft().document, path:`verification_documents/owner/${id}/document`}}));
 });
 test('finalization must use server timestamp and correct transition', async () => {
   await create();
-  await assertFails(updateDoc(revision(db('locum')), {state:'submitted', submittedAt:Timestamp.fromMillis(1)}));
+  await assertFails(updateDoc(revision(db('locum')), {state:'submitted', submittedAt:Timestamp.fromMillis(1), updatedAt:serverTimestamp()}));
   await assertFails(updateDoc(revision(db('locum')), {state:'pending'}));
 });
 test('account_management and nested Admin decisions are never client writable', async () => {
@@ -148,9 +150,12 @@ test('Storage is private, create-only, and cannot be uploaded after submission',
   await assertFails(uploadBytes(own, bytes, metadata));
   await assertFails(deleteObject(ref(storage('admin', {admin:true}), path)));
 });
-test('Practice Owners cannot upload evidence', async () => {
+test('both account types can only read their own private uploads', async () => {
   await create('owner');
-  await assertFails(uploadBytes(ref(storage('owner'), `verification_documents/owner/${id}/document`), bytes, metadata));
+  const ownerFile = ref(storage('owner'), `verification_documents/owner/${id}/document`);
+  await assertSucceeds(uploadBytes(ownerFile, bytes, metadata));
+  await assertSucceeds(getBytes(ownerFile));
+  await assertFails(getBytes(ref(storage('other'), `verification_documents/owner/${id}/document`)));
 });
 test('submitted without upload is untrusted evidence, never an approval', async () => {
   // Firestore rules cannot inspect Storage. Phase 2 review must validate the
@@ -158,5 +163,5 @@ test('submitted without upload is untrusted evidence, never an approval', async 
   await create();
   await assertSucceeds(submit());
   await assertFails(uploadBytes(ref(storage('locum'), path), bytes, metadata));
-  assert.equal((await getDoc(revision(db('locum')))).data().verificationStatus, undefined);
+  assert.equal((await getDoc(revision(db('locum')))).data().verificationStatus, 'pending');
 });

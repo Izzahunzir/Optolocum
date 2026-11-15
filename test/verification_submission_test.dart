@@ -105,11 +105,11 @@ void main() {
   );
   test('exact fields, private reference, no decisions or local paths', () {
     final s = locum();
-    expect(s.payload['fields'], personal);
+    expect(s.payload['submittedFields'], personal);
     expect(s.payload['accountType'], 'locum');
     expect(s.payload['schemaVersion'], 1);
     expect((s.payload['document'] as Map)['path'], s.documentPath);
-    expect(s.payload.keys, isNot(contains('verificationStatus')));
+    expect(s.payload['verificationStatus'], 'pending');
     expect(s.payload.keys, isNot(contains('role')));
     expect(() => s.fields['email'] = 'changed', throwsUnsupportedError);
     expect(() => s.document!.bytes[0] = 0, throwsUnsupportedError);
@@ -169,7 +169,6 @@ void main() {
         uid: 'owner',
         accountType: VerificationAccountType.practiceOwner,
         fields: practice,
-        document: pdf(),
       ),
       throwsFormatException,
     );
@@ -225,18 +224,20 @@ void main() {
     },
   );
   test(
-    'Practice Owner persists exact fields without upload or document',
+    'Practice Owner persists exact fields and uploads required document',
     () async {
       final repo = MemoryRepository()..currentUid = 'owner';
       final s = VerificationSubmission(
         uid: 'owner',
         accountType: VerificationAccountType.practiceOwner,
         fields: practice,
+        document: pdf(),
       );
       await VerificationSubmissionService(repo).submit(s);
-      expect(repo.events, ['reserve', 'finalize', 'afterCommit']);
-      expect(repo.records[s.id]!['fields'], practice);
-      expect(repo.records[s.id]!.containsKey('document'), false);
+      expect(repo.events, ['reserve', 'upload', 'finalize', 'afterCommit']);
+      expect(repo.records[s.id]!['submittedFields'], practice);
+      expect(repo.records[s.id]!['verificationStatus'], 'pending');
+      expect(repo.records[s.id]!.containsKey('document'), true);
     },
   );
   for (final stage in ['reserve', 'upload', 'finalize', 'afterCommit']) {

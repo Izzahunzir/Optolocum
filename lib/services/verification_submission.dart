@@ -84,8 +84,8 @@ class VerificationSubmission {
         fields.values.any((v) => v.trim().isEmpty || v.length > 2000)) {
       throw const FormatException('Complete all verification fields.');
     }
-    if ((accountType == VerificationAccountType.locum) != (document != null)) {
-      throw const FormatException('Locums must supply exactly one document.');
+    if (document == null) {
+      throw const FormatException('A verification document is required.');
     }
     if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(
       fields[accountType == VerificationAccountType.locum
@@ -148,6 +148,7 @@ class VerificationSubmission {
     'Johor',
     'Kedah',
     'Kelantan',
+    'Kuala Lumpur',
     'Melaka',
     'Negeri Sembilan',
     'Pahang',
@@ -158,6 +159,8 @@ class VerificationSubmission {
     'Sarawak',
     'Selangor',
     'Terengganu',
+    'Putrajaya',
+    'Labuan',
   ];
   final String uid, id;
   final VerificationAccountType accountType;
@@ -187,7 +190,8 @@ class VerificationSubmission {
     'uid': uid,
     'accountType': kind,
     'schemaVersion': 1,
-    'fields': fields,
+    'submittedFields': fields,
+    'verificationStatus': 'pending',
     'fingerprint': fingerprint,
     if (document case final doc?)
       'document': {

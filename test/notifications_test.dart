@@ -6,7 +6,9 @@ import 'package:optolocum/features/clinic_owner/CO_messages.dart';
 
 void main() {
   testWidgets('Notifications navigation opens an empty inbox', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: COMainPage()));
+    await tester.pumpWidget(
+      MaterialApp(home: COMainPage(jobsStream: Stream.value([]))),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Notifications'));
     await tester.pumpAndSettle();

@@ -1,17 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:optolocum/features/clinic_owner/CO_mainpage.dart';
 import 'package:optolocum/features/clinic_owner/CO_verification_status.dart';
+
+class _Auth extends Mock implements FirebaseAuth {}
 
 void main() {
   testWidgets(
     'Profile supports help, contact, live status and confirmed logout',
     (tester) async {
+      final auth = _Auth();
+      when(() => auth.signOut()).thenAnswer((_) async {});
       coVerificationStatus.value = COVerificationStatus.unverified;
       addTearDown(
         () => coVerificationStatus.value = COVerificationStatus.unverified,
       );
-      await tester.pumpWidget(const MaterialApp(home: COMainPage()));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: COMainPage(jobsStream: Stream.value([]), auth: auth),
+        ),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Profile'));
       await tester.pumpAndSettle();
@@ -28,7 +38,7 @@ void main() {
       coVerificationStatus.value = COVerificationStatus.pending;
       await tester.pumpAndSettle();
       expect(find.text('Pending Verification'), findsOneWidget);
-      coVerificationStatus.value = COVerificationStatus.verified;
+      coVerificationStatus.value = COVerificationStatus.approved;
       await tester.pumpAndSettle();
       expect(find.text('Verified'), findsOneWidget);
       await tester.pageBack();
@@ -44,10 +54,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
-      expect(coVerificationStatus.value, COVerificationStatus.verified);
+      expect(coVerificationStatus.value, COVerificationStatus.approved);
       await tester.tap(find.text('Logout'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Log Out'));
+      await tester.tap(find.text('Log Out').last);
       await tester.pumpAndSettle();
       expect(find.text('Welcome to\nOptolocum'), findsOneWidget);
       expect(coVerificationStatus.value, COVerificationStatus.unverified);

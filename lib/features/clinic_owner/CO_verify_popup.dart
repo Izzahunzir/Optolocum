@@ -2,6 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'CO_mainpage.dart';
+import 'CO_postingjob.dart';
+
+import 'package:optolocum/services/job_service.dart';
+
 import 'CO_verification_form.dart';
 import 'CO_verification_status.dart';
 
@@ -11,9 +15,13 @@ class COVerifyPopup extends StatefulWidget {
     super.key,
     this.displayName = 'Clinic Owner',
     this.onCompleteProfile,
+    this.jobsStream,
+    this.jobService,
   });
   final String displayName;
   final VoidCallback? onCompleteProfile;
+  final Stream<List<COJobPosting>>? jobsStream;
+  final JobService? jobService;
 
   @override
   State<COVerifyPopup> createState() => _COVerifyPopupState();
@@ -25,7 +33,7 @@ class _COVerifyPopupState extends State<COVerifyPopup> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
-          coVerificationStatus.value == COVerificationStatus.verified) {
+          coVerificationStatus.value == COVerificationStatus.approved) {
         return;
       }
       showDialog<void>(
@@ -50,7 +58,8 @@ class _COVerifyPopupState extends State<COVerifyPopup> {
   }
 
   @override
-  Widget build(BuildContext context) => const COMainPage();
+  Widget build(BuildContext context) =>
+      COMainPage(jobsStream: widget.jobsStream, jobService: widget.jobService);
 }
 
 class _VerificationDialog extends StatefulWidget {
@@ -76,7 +85,7 @@ class _VerificationDialogState extends State<_VerificationDialog> {
 
   void _onVerificationChanged() {
     if (mounted &&
-        coVerificationStatus.value == COVerificationStatus.verified &&
+        coVerificationStatus.value == COVerificationStatus.approved &&
         ModalRoute.of(context)?.isCurrent == true) {
       Navigator.of(context).pop();
     }

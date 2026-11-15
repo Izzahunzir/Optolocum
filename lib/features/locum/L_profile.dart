@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_selector/file_selector.dart';
 
 import 'dart:async';
 
@@ -17,6 +18,8 @@ class LProfile extends StatefulWidget {
     required this.onSavedJobs,
     this.name = 'Locum',
     this.shiftHours = 0,
+    this.profileService,
+    this.pickDocument,
   });
 
   final VoidCallback onLogout;
@@ -24,13 +27,15 @@ class LProfile extends StatefulWidget {
   final VoidCallback onSavedJobs;
   final String name;
   final int shiftHours;
+  final LocumProfileService? profileService;
+  final Future<XFile?> Function()? pickDocument;
 
   @override
   State<LProfile> createState() => _LProfileState();
 }
 
 class _LProfileState extends State<LProfile> {
-  final _service = LocumProfileService.instance;
+  late final _service = widget.profileService ?? LocumProfileService.instance;
   StreamSubscription<dynamic>? _authSubscription;
   bool _loading = true;
   String? _error;
@@ -163,7 +168,11 @@ class _LProfileState extends State<LProfile> {
                 await Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     // Reuse the onboarding form, but prefill it and show Update.
-                    builder: (_) => const LVerificationForm(isEditing: true),
+                    builder: (_) => LVerificationForm(
+                      isEditing: true,
+                      profileService: widget.profileService,
+                      pickDocument: widget.pickDocument,
+                    ),
                   ),
                 );
                 if (mounted) await _load();

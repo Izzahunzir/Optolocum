@@ -2,11 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:optolocum/services/application_service.dart';
 
 void main() {
-  test('applicant summary exposes only the three permitted profile fields', () {
+  test('applicant summary exposes only permitted profile fields', () {
     final summary = ApplicantSummary.fromFirestore({
       'fullName': '  Test Locum  ',
       'highestEducation': "Bachelor's Degree",
       'course': 'Optometry',
+      'verificationStatus': 'unverified',
       'nric': 'private-nric',
       'dateOfBirth': '2000-01-01',
       'phoneNumber': 'private-phone',
@@ -18,6 +19,7 @@ void main() {
       'fullName': 'Test Locum',
       'highestEducation': "Bachelor's Degree",
       'course': 'Optometry',
+      'verificationStatus': 'unverified',
     });
   });
 

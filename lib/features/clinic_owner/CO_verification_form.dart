@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:file_selector/file_selector.dart';
 
 import '../../services/verification_submission.dart';
+import 'CO_verification_status.dart';
 
 class COVerificationForm extends StatefulWidget {
   const COVerificationForm({
     super.key,
     this.submissions = const DisabledVerificationSubmissions(),
     this.currentUid,
+    this.pickDocument,
   });
   final VerificationSubmissionClient submissions;
   final String? Function()? currentUid;
+  final Future<XFile?> Function()? pickDocument;
 
   static const practiceTypes = [
     'Hospital',
@@ -22,6 +26,7 @@ class COVerificationForm extends StatefulWidget {
     'Johor',
     'Kedah',
     'Kelantan',
+    'Kuala Lumpur',
     'Melaka',
     'Negeri Sembilan',
     'Pahang',
@@ -32,6 +37,8 @@ class COVerificationForm extends StatefulWidget {
     'Sarawak',
     'Selangor',
     'Terengganu',
+    'Putrajaya',
+    'Labuan',
   ];
 
   @override
@@ -43,8 +50,11 @@ class _COVerificationFormState extends State<COVerificationForm> {
   final _formKey = GlobalKey<FormState>();
   final _values = <String, String>{};
   bool _saving = false;
+  int _step = 0;
   VerificationSubmission? _attempt;
   String? _initialUid;
+  XFile? _document;
+  String? _documentError;
 
   String? _currentUid() => widget.currentUid != null
       ? widget.currentUid!()
@@ -61,13 +71,45 @@ class _COVerificationFormState extends State<COVerificationForm> {
   static const _keys = {
     'Type of Practice': 'practiceType',
     'Clinic Name': 'clinicName',
-    'Clinic Registration Number/ CSSM/ Business Registration':
+    'Clinic Registration Number (SSM / Business Registration)':
         'registrationNumber',
     'Clinic Address': 'address',
     'State': 'state',
     'Clinic Contact Number': 'contactNumber',
     'Email (Company)': 'companyEmail',
   };
+
+  Future<void> _pickDocument() async {
+    try {
+      final file =
+          await (widget.pickDocument?.call() ??
+              openFile(
+                acceptedTypeGroups: [
+                  const XTypeGroup(
+                    label: 'SSM registration documents',
+                    extensions: ['pdf', 'png', 'jpg', 'jpeg'],
+                    mimeTypes: ['application/pdf', 'image/png', 'image/jpeg'],
+                  ),
+                ],
+              ));
+      if (file == null) return;
+      await VerificationDocument.fromFile(file);
+      if (!mounted) return;
+      setState(() {
+        _document = file;
+        _documentError = null;
+        _attempt = null;
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _documentError = error is FormatException
+              ? error.message
+              : 'Could not select document. Please try again.',
+        );
+      }
+    }
+  }
 
   InputDecoration _decoration(String hint) => InputDecoration(
     hintText: hint,
@@ -169,8 +211,21 @@ class _COVerificationFormState extends State<COVerificationForm> {
   );
 
   Future<void> _submit() async {
-    if (_saving || !_formKey.currentState!.validate()) return;
-    _formKey.currentState!.save();
+    if (_saving) return;
+    if (_step == 0) {
+      if (!_formKey.currentState!.validate()) return;
+      _formKey.currentState!.save();
+      FocusScope.of(context).unfocus();
+      setState(() => _step = 1);
+      return;
+    }
+    if (_document == null) {
+      setState(
+        () => _documentError =
+            'Choose one SSM certificate or Company Profile document.',
+      );
+      return;
+    }
     FocusScope.of(context).unfocus();
     setState(() => _saving = true);
     try {
@@ -187,6 +242,7 @@ class _COVerificationFormState extends State<COVerificationForm> {
         uid: uid,
         accountType: VerificationAccountType.practiceOwner,
         fields: _values,
+        document: await VerificationDocument.fromFile(_document!),
       );
       if (_attempt?.fingerprint != candidate.fingerprint) _attempt = candidate;
       await widget.submissions.submit(_attempt!);
@@ -194,12 +250,13 @@ class _COVerificationFormState extends State<COVerificationForm> {
       if (_currentUid() != uid) {
         throw StateError('Your account changed. Please reopen the form.');
       }
+      coVerificationStatus.value = COVerificationStatus.pending;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
             content: Text(
-              'Your practice details have been submitted for review.',
+              'Your details and SSM document have been submitted for review.',
             ),
           ),
         );
@@ -265,8 +322,10 @@ class _COVerificationFormState extends State<COVerificationForm> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Text(
-                            'Company Information',
+                          Text(
+                            _step == 0
+                                ? 'Company Information'
+                                : 'Company Information Document Preview',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 23,
@@ -274,12 +333,15 @@ class _COVerificationFormState extends State<COVerificationForm> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          const Text(
-                            'Verify your clinic’s identity by filling out the\ninformation below',
+                          Text(
+                            _step == 0
+                                ? 'Verify your clinic’s identity by filling out the\ninformation below'
+                                : 'SSM Business Registration Certificate / Company Profile',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12),
+                            style: const TextStyle(fontSize: 12),
                           ),
                           const SizedBox(height: 22),
+                          if (_step == 0) ...[
                           _dropdown(
                             'Type of Practice',
                             COVerificationForm.practiceTypes,
@@ -293,7 +355,7 @@ class _COVerificationFormState extends State<COVerificationForm> {
                             ],
                           ),
                           _field(
-                            'Clinic Registration Number/ CSSM/ Business Registration',
+                            'Clinic Registration Number (SSM / Business Registration)',
                             'e.g., 202401012345 or KKM/CKAPS/12345',
                           ),
                           _field(
@@ -338,10 +400,92 @@ class _COVerificationFormState extends State<COVerificationForm> {
                                 ? null
                                 : 'Enter a valid company email',
                           ),
+                          ] else ...[
+                          const SizedBox(height: 4),
+                          OutlinedButton(
+                            onPressed: _saving ? null : _pickDocument,
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.all(30),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                const Icon(
+                                  Icons.cloud_upload,
+                                  size: 54,
+                                  color: Color(0xFF9B9EAF),
+                                ),
+                                Text(
+                                  _document == null
+                                      ? 'Choose one document'
+                                      : 'Choose a different document',
+                                ),
+                                const Text(
+                                  'PNG, JPG, JPEG or PDF up to 50 MB',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_document case final document?)
+                            Card(
+                              color: const Color(0xFFEEF2F1),
+                              child: ListTile(
+                                leading: Icon(
+                                  document.name.toLowerCase().endsWith('.pdf')
+                                      ? Icons.picture_as_pdf
+                                      : Icons.image,
+                                  color: Colors.red,
+                                ),
+                                title: Text(
+                                  document.name,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                                trailing: IconButton(
+                                  tooltip: 'Remove document',
+                                  icon: const Icon(Icons.close),
+                                  onPressed: _saving
+                                      ? null
+                                      : () => setState(() {
+                                          _document = null;
+                                          _documentError = null;
+                                        }),
+                                ),
+                              ),
+                            ),
+                          if (_documentError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(
+                                _documentError!,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
                     const SizedBox(height: 28),
+                    if (_step == 1) ...[
+                      OutlinedButton(
+                        onPressed: _saving ? null : () => setState(() => _step = 0),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          foregroundColor: _blue,
+                          side: const BorderSide(color: _blue),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text('Back'),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     ElevatedButton(
                       onPressed: _saving ? null : _submit,
                       style: ElevatedButton.styleFrom(
@@ -353,7 +497,7 @@ class _COVerificationFormState extends State<COVerificationForm> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: const Text('Verify Account'),
+                      child: Text(_step == 0 ? 'Next' : 'Verify Account'),
                     ),
                   ],
                 ),

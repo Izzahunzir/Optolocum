@@ -54,6 +54,7 @@ class COLocumActivity extends StatelessWidget {
   const COLocumActivity({
     super.key,
     this.clinicOwnerId,
+    this.authStream,
     this.applications = const [],
     this.onApprove,
     this.onReject,
@@ -62,6 +63,7 @@ class COLocumActivity extends StatelessWidget {
   // Retained for source compatibility. Live data always uses the authenticated
   // owner; supplied applications and action callbacks are not used.
   final String? clinicOwnerId;
+  final Stream<User?>? authStream;
   final List<COLocumApplication> applications;
 
   /// Reserved for future backend integration; all actions remain disabled.
@@ -69,7 +71,7 @@ class COLocumActivity extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => StreamBuilder<User?>(
-    stream: FirebaseAuth.instance.authStateChanges(),
+    stream: authStream ?? FirebaseAuth.instance.authStateChanges(),
     builder: (context, auth) {
       if (auth.hasError) {
         return _page(context, error: 'Unable to verify your session.');
@@ -368,10 +370,7 @@ class _ApplicationCard extends StatelessWidget {
             children: [
               const Text(
                 'Locum Details',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
               Text('Full Name: ${applicant.name}'),
@@ -380,10 +379,7 @@ class _ApplicationCard extends StatelessWidget {
               const SizedBox(height: 12),
               const Text(
                 'Account Verification',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 8),
               Row(
@@ -392,21 +388,21 @@ class _ApplicationCard extends StatelessWidget {
                     applicant.verificationStatus == 'verified'
                         ? Icons.verified
                         : applicant.verificationStatus == 'pending'
-                            ? Icons.access_time
-                            : Icons.info_outline,
+                        ? Icons.access_time
+                        : Icons.info_outline,
                     color: applicant.verificationStatus == 'verified'
                         ? Colors.green
                         : applicant.verificationStatus == 'pending'
-                            ? Colors.orange
-                            : Colors.grey,
+                        ? Colors.orange
+                        : Colors.grey,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     applicant.verificationStatus == 'verified'
                         ? 'Verified'
                         : applicant.verificationStatus == 'pending'
-                            ? 'Pending Verification'
-                            : 'Unverified',
+                        ? 'Pending Verification'
+                        : 'Unverified',
                   ),
                 ],
               ),
@@ -421,10 +417,7 @@ class _ApplicationCard extends StatelessWidget {
               const SizedBox(height: 12),
               const Text(
                 'Qualification information is self-reported and has not been independently verified.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
           ),
@@ -572,8 +565,16 @@ class _ApplicationCard extends StatelessWidget {
                 applicant.jobDate,
               ),
               detail(Icons.access_time, 'Time', applicant.time),
-              detail(Icons.location_on_outlined, 'Location', applicant.location),
-              detail(Icons.description_outlined, 'Position', applicant.position),
+              detail(
+                Icons.location_on_outlined,
+                'Location',
+                applicant.location,
+              ),
+              detail(
+                Icons.description_outlined,
+                'Position',
+                applicant.position,
+              ),
               const SizedBox(height: 8),
               if (applicant.status == COLocumActivityStatus.pending)
                 Row(
@@ -602,7 +603,7 @@ class _ApplicationCard extends StatelessWidget {
             ],
           ),
         ),
-        ),
+      ),
     );
   }
 }

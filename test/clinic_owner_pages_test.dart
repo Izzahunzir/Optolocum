@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:optolocum/features/auth/CO_signin.dart';
 import 'package:optolocum/features/clinic_owner/CO_mainpage.dart';
 import 'package:optolocum/features/clinic_owner/CO_verify_popup.dart';
-import 'package:optolocum/main.dart';
 import 'package:optolocum/features/clinic_owner/CO_verification_status.dart';
+import 'package:optolocum/services/auth_service.dart';
+
+class _AuthService extends Mock implements AuthService {}
+
+class _UserCredential extends Mock implements UserCredential {}
 
 void main() {
   testWidgets('Empty jobs appears after approval, not while pending', (
@@ -13,13 +20,15 @@ void main() {
     addTearDown(
       () => coVerificationStatus.value = COVerificationStatus.unverified,
     );
-    await tester.pumpWidget(const MaterialApp(home: COMainPage()));
+    await tester.pumpWidget(
+      MaterialApp(home: COMainPage(jobsStream: Stream.value([]))),
+    );
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.description_rounded), findsNothing);
     coVerificationStatus.value = COVerificationStatus.pending;
     await tester.pump(const Duration(minutes: 5));
     expect(find.byIcon(Icons.description_rounded), findsNothing);
-    coVerificationStatus.value = COVerificationStatus.verified;
+    coVerificationStatus.value = COVerificationStatus.approved;
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.description_rounded), findsOneWidget);
     expect(
@@ -38,7 +47,9 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
-        const MaterialApp(home: COMainPage(isVerified: true)),
+        MaterialApp(
+          home: COMainPage(isVerified: true, jobsStream: Stream.value([])),
+        ),
       );
       await tester.pumpAndSettle();
       expect(
@@ -70,6 +81,7 @@ void main() {
       MaterialApp(
         home: COVerifyPopup(
           displayName: 'Natalie Tan',
+          jobsStream: Stream.value([]),
           onCompleteProfile: () => profileRequested = true,
         ),
       ),
@@ -87,9 +99,21 @@ void main() {
   testWidgets(
     'Sign-in preview opens verification without granting verified access',
     (tester) async {
-      await tester.pumpWidget(const MyApp());
-      await tester.ensureVisible(find.text('Clinic Owner'));
-      await tester.tap(find.text('Clinic Owner'));
+      final authService = _AuthService();
+      when(
+        () => authService.signIn(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => _UserCredential());
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CompanyOwnerSigninPage(
+            authService: authService,
+            jobsStream: Stream.value([]),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
       final fields = find.byType(TextFormField);
       await tester.enterText(fields.at(0), 'natalie@gmail.com');

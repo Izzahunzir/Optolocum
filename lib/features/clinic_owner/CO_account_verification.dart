@@ -30,11 +30,17 @@ class COAccountVerification extends StatelessWidget {
             Icons.hourglass_top,
             Colors.orange,
           ),
-          COVerificationStatus.verified => (
+          COVerificationStatus.approved => (
             'Verified',
             'Your clinic account has been verified.',
             Icons.verified_user,
             const Color(0xFF237F7D),
+          ),
+          COVerificationStatus.rejected => (
+            'Verification Needs Attention',
+            'Your clinic verification was not approved. Update your details and submit again.',
+            Icons.error_outline,
+            Colors.red,
           ),
         };
         return Center(
@@ -65,7 +71,8 @@ class COAccountVerification extends StatelessWidget {
                       color: Color(0xFF666666),
                     ),
                   ),
-                  if (status == COVerificationStatus.unverified) ...[
+                  if (status == COVerificationStatus.unverified ||
+                      status == COVerificationStatus.rejected) ...[
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: () => Navigator.push(
