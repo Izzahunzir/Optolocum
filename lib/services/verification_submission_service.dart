@@ -128,6 +128,7 @@ class FirebaseVerificationRepository implements VerificationRepository {
         ...s.payload,
         'state': 'draft',
         'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
     });
   }
@@ -179,6 +180,7 @@ class FirebaseVerificationRepository implements VerificationRepository {
       tx.update(_ref(s), {
         'state': 'submitted',
         'submittedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
     });
   }

@@ -7,15 +7,16 @@ import 'CO_contact_us.dart';
 import 'CO_navigation.dart';
 import 'CO_verification_status.dart';
 import 'CO_account_verification.dart';
-import 'CO_postingjob.dart';
 
 class COProfile extends StatelessWidget {
   const COProfile({
     super.key,
+    this.auth,
     this.name = 'Clinic Owner',
     this.role = 'Practice Owner',
     this.clinicName = 'Clinic details not provided',
   });
+  final FirebaseAuth? auth;
   final String name, role, clinicName;
 
   void _help(BuildContext context) => showDialog<void>(
@@ -69,7 +70,7 @@ class COProfile extends StatelessWidget {
     final confirmed = await showLogoutDialog(context);
     if (confirmed != true || !context.mounted) return;
     try {
-      await FirebaseAuth.instance.signOut();
+      await (auth ?? FirebaseAuth.instance).signOut();
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -79,7 +80,6 @@ class COProfile extends StatelessWidget {
     }
     if (!context.mounted) return;
     coVerificationStatus.value = COVerificationStatus.unverified;
-    coJobPostings.value = const [];
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const IntroPage()),
       (_) => false,

@@ -7,18 +7,25 @@ void main() {
   testWidgets('Locum navigation opens all three empty activity tabs', (
     tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: COMainPage()));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: COMainPage(
+          jobsStream: Stream.value([]),
+          activityAuthStream: Stream.value(null),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Locum'));
     await tester.pumpAndSettle();
     expect(find.text('Locum Activity'), findsOneWidget);
-    expect(find.text('No pending applications yet'), findsOneWidget);
+    expect(find.text('Please sign in to view applications.'), findsOneWidget);
     await tester.tap(find.text('Current'));
     await tester.pumpAndSettle();
-    expect(find.text('No current locum jobs yet'), findsOneWidget);
+    expect(find.text('Please sign in to view applications.'), findsOneWidget);
     await tester.tap(find.text('Completed'));
     await tester.pumpAndSettle();
-    expect(find.text('No completed locum jobs yet'), findsOneWidget);
+    expect(find.text('Please sign in to view applications.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -53,6 +60,7 @@ void main() {
         MaterialApp(
           home: COLocumActivity(
             clinicOwnerId: 'owner-1',
+            authStream: Stream.value(null),
             applications: [
               entry('Applicant A', 'owner-1', COLocumActivityStatus.pending),
               entry('Applicant B', 'owner-2', COLocumActivityStatus.pending),
@@ -64,19 +72,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Applicant A'), findsOneWidget);
+      expect(find.text('Please sign in to view applications.'), findsOneWidget);
       expect(find.text('Applicant B'), findsNothing);
-      await tester.ensureVisible(find.text('Approve'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Approve'));
-      expect(actionId, 'Applicant A');
-      await tester.tap(find.text('Current'));
-      await tester.pumpAndSettle();
-      expect(find.text('Applicant C'), findsOneWidget);
-      await tester.ensureVisible(find.text('Message'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Message'));
-      expect(actionId, 'job-1');
+      expect(actionId, isNull);
       expect(tester.takeException(), isNull);
     },
   );

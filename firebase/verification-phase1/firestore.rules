@@ -21,7 +21,7 @@ service cloud.firestore {
         && f.keys().hasOnly(['practiceType','clinicName','registrationNumber','address','state','contactNumber','companyEmail'])
         && f.practiceType in ['Hospital','Private Optical Clinic','Retail Optical Store','University/Training Institution']
         && text(f.clinicName) && text(f.registrationNumber) && text(f.address)
-        && f.state in ['Johor','Kedah','Kelantan','Melaka','Negeri Sembilan','Pahang','Penang','Perak','Perlis','Sabah','Sarawak','Selangor','Terengganu']
+        && f.state in ['Johor','Kedah','Kelantan','Kuala Lumpur','Melaka','Negeri Sembilan','Pahang','Penang','Perak','Perlis','Putrajaya','Sabah','Sarawak','Selangor','Terengganu','Labuan']
         && phone(f.contactNumber) && email(f.companyEmail);
     }
     function document(d, uid, id) {
@@ -39,22 +39,25 @@ service cloud.firestore {
     function payload(d, uid, id) {
       return d.uid == uid && d.schemaVersion is int && d.schemaVersion == 1 && id.matches('^[a-f0-9]{40}$')
         && d.fingerprint is string && d.fingerprint.matches('^[a-f0-9]{64}$')
-        && ((d.accountType == 'locum' && locumFields(d.fields) && document(d.document,uid,id))
-          || (d.accountType == 'practice_owner' && practiceFields(d.fields) && !d.keys().hasAny(['document'])));
+        && d.verificationStatus == 'pending'
+        && ((d.accountType == 'locum' && locumFields(d.submittedFields) && document(d.document,uid,id))
+          || (d.accountType == 'practice_owner' && practiceFields(d.submittedFields) && document(d.document,uid,id)));
     }
     match /verification_submissions/{uid}/revisions/{id} {
       allow get, list: if owner(uid) || admin();
       allow create: if owner(uid)
-        && request.resource.data.keys().hasAll(['uid','accountType','schemaVersion','fields','fingerprint','state','createdAt'])
-        && request.resource.data.keys().hasOnly(['uid','accountType','schemaVersion','fields','fingerprint','document','state','createdAt'])
+        && request.resource.data.keys().hasAll(['uid','accountType','schemaVersion','submittedFields','verificationStatus','fingerprint','document','state','createdAt','updatedAt'])
+        && request.resource.data.keys().hasOnly(['uid','accountType','schemaVersion','submittedFields','verificationStatus','fingerprint','document','state','createdAt','updatedAt'])
         && payload(request.resource.data,uid,id)
         && request.resource.data.state == 'draft'
-        && request.resource.data.createdAt == request.time;
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
       // The only client transition. Evidence and timestamps cannot be replaced.
       allow update: if owner(uid) && resource.data.state == 'draft'
         && request.resource.data.state == 'submitted'
         && request.resource.data.submittedAt == request.time
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state','submittedAt']);
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state','submittedAt','updatedAt']);
       allow delete: if false;
     }
     match /verification_submissions/{uid} { allow read, write: if false; }

@@ -49,6 +49,10 @@ class _LVerificationFormState extends State<LVerificationForm> {
   void initState() {
     super.initState();
     _uid = _service.currentUid;
+    final cachedProfile = locumProfileData.value;
+    if (cachedProfile?.uid == _uid) {
+      _documents.addAll(cachedProfile!.documents);
+    }
     _controllers = {
       for (final label in [
         'Full Name',
@@ -93,9 +97,13 @@ class _LVerificationFormState extends State<LVerificationForm> {
         for (final entry in _controllers.entries) {
           entry.value.text = profile.fields[entry.key] ?? '';
         }
-        _documents
-          ..clear()
-          ..addAll(profile.documents);
+        // Evidence is intentionally session-only. Keep same-account previews
+        // already in memory when a profile reload only returns Firestore fields.
+        if (profile.documents.isNotEmpty) {
+          _documents
+            ..clear()
+            ..addAll(profile.documents);
+        }
       }
     } catch (_) {
       if (mounted && !_accountChanged) {
@@ -402,8 +410,8 @@ class _LVerificationFormState extends State<LVerificationForm> {
                       if (_uploadStep) ...[
                         Text(
                           widget.submissions is DisabledVerificationSubmissions
-                              ? 'Choose one document for private review. Submission is currently unavailable until verification is enabled.'
-                              : 'Choose one document to submit privately for Admin review.',
+                              ? 'Choose one combined MOC Registration Certificate and current APC document. Submission is currently unavailable until verification is enabled.'
+                              : 'Choose one combined MOC Registration Certificate and current APC document for private review.',
                           style: const TextStyle(
                             fontSize: 12,
                             color: Colors.grey,

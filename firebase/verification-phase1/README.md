@@ -13,10 +13,8 @@ Storage emulators, and rejects nonlocal hosts. The injectable client interface i
 for tests and future approved integration; it is not wired to production.
 
 With submission disabled, Locums retain the original profile-only save and
-navigation. Exactly one valid document is now required on the document step, but
-that document stays local. The message explicitly says it was not uploaded or
-submitted. Practice Owners see an unavailable message after validation and do not
-write a submission. Neither case announces a successful verification submission.
+navigation. Both account types require one valid document. The disabled client
+does not upload evidence or write a submission, and the UI says so explicitly.
 
 For an offline harness, initialize a *separate named app* with a
 `demo-optolocum-verification` FirebaseOptions project and demo storage bucket. Pass
@@ -37,28 +35,31 @@ demo app. Phase 1 widget tests mock it. Emulator addresses default to
 | uid | Authenticated submitting UID |
 | accountType | `locum` or `practice_owner`: evidence category, **not** a trusted account role |
 | schemaVersion | Integer 1 |
-| fields | Exact trimmed values from the existing form, with no extra profile fields |
+| submittedFields | Exact trimmed values from the existing form, separate from profile data |
+| verificationStatus | `pending` only; clients cannot write `approved` or `rejected` |
 | fingerprint | SHA-256 of canonical input, used to retain an attempt when retrying |
-| state | `draft` then `submitted`; never an approval status |
+| state | `draft` then `submitted`; separate from review status |
 | createdAt | Server timestamp when reserving the revision |
-| submittedAt | Server timestamp only when finalizing |
-| document | Locum only: private path, filename, MIME type, byte count and SHA-256 |
+| submittedAt, updatedAt | Server timestamps; updatedAt is refreshed on finalization |
+| document | Required for both account types: private path, filename, MIME type, byte count and SHA-256 |
 
 Locum field keys: fullName, email, nric, phoneNumber, gender, dateOfBirth,
 highestEducation, course. Practice keys: practiceType, clinicName,
 registrationNumber, address, state, contactNumber, companyEmail.
 
-The Locum object lives at
+Evidence objects live at
 `verification_documents/{uid}/{submissionId}/document`. No local paths, document
 bytes, public URLs, approval fields, trusted roles, or reviewer identities are
-written to Firestore. Practice Owner submissions have no document.
+written to Firestore. Practice Owner evidence uses the same private object path.
 
 ## Persistence and failure behavior
 
 The service reserves a server-confirmed draft, uploads and confirms object
-metadata, performs the existing Locum profile save, then finalizes in a Firestore
-transaction. Practice Owners skip upload and profile mutation. Success is shown
-only after completion. The legacy Locum profile `pending` value is preserved;
+metadata for either account type, performs the existing Locum profile save, then
+finalizes in a Firestore transaction. Practice Owners keep profile fields separate
+and do not mutate their profile during evidence submission. Success is shown
+only after completion. Existing Locum `verified`/`approved` profile status is
+preserved during an edit; a new submission does not downgrade it. The legacy Locum `pending` value
 it is not evidence that Admin reviewed anything and may remain pending after a
 later finalization failure.
 
@@ -75,7 +76,7 @@ safe revision; automatic cross-restart draft recovery is not provided. A future
 recovery caller can reselect the document and construct the same model with the
 persisted revision ID; complete payload comparison prevents mismatched reuse.
 Abandoned drafts require a separately approved server cleanup/retention policy.
-The app never deletes submissions or objects as part of retry handling.
+The app never deletes submissions or objects as part of retry handling. Practice Owner evidence uses the same private Storage path and file constraints.
 
 ## Security boundaries
 

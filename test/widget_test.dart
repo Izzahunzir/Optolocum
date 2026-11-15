@@ -22,11 +22,10 @@ void main() {
       await tester.ensureVisible(find.text('Locum'));
       await tester.tap(find.text('Locum'));
       await tester.pump();
-      expect(
-        find.text('Locum selected. Registration is coming soon.'),
-        findsOneWidget,
-      );
-      await tester.pumpAndSettle(const Duration(seconds: 5));
+      // Locum now enters the existing sign-in flow directly.
+      expect(find.text('Login as a'), findsOneWidget);
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Clinic Owner'));
       await tester.tap(find.text('Clinic Owner'));
       await tester.pumpAndSettle();
@@ -95,13 +94,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Optical Owner').last);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Sign Up'));
-    await tester.tap(find.text('Sign Up'));
-    await tester.pumpAndSettle();
-    expect(
-      find.text('Your details are ready. Account registration is coming soon.'),
-      findsOneWidget,
-    );
+    // Keep this UI test independent from Firebase Auth. The separate practice
+    // owner signup test exercises the authenticated submission path.
+    expect(find.text('Optical Owner'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
 import 'package:optolocum/features/clinic_owner/CO_verification_form.dart';
-import 'package:optolocum/services/verification_submission.dart';
 
 void main() {
   testWidgets(
@@ -34,7 +34,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Johor').last);
       await tester.pumpAndSettle();
-      expect(COVerificationForm.states.length, 13);
+      expect(COVerificationForm.states.length, 16);
       expect(
         tester.widget<DropdownButtonFormField<String>>(state).initialValue,
         isNull,
@@ -53,11 +53,12 @@ void main() {
       }
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Verify Account'));
+      await tester.ensureVisible(find.text('Verify Account'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Verify Account'));
       await tester.pumpAndSettle();
       expect(
-        find.text(DisabledVerificationSubmissions.message),
+        find.text('Choose one SSM certificate or Company Profile document.'),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);

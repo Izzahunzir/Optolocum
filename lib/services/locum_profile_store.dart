@@ -12,8 +12,13 @@ class LocumProfileStore {
     final reference = firestore.collection('locum_profiles').doc(profile.uid);
     await firestore.runTransaction<void>((transaction) async {
       final snapshot = await transaction.get(reference);
+      final existingStatus = snapshot.data()?['verificationStatus'];
+      final preserveApproval =
+          existingStatus == 'verified' || existingStatus == 'approved';
+      final fields = profile.toFirestore();
+      if (preserveApproval) fields.remove('verificationStatus');
       transaction.set(reference, {
-        ...profile.toFirestore(),
+        ...fields,
         // Test document existence, not field presence: older profiles must not
         // acquire a guessed registration date when they are next edited.
         if (!snapshot.exists) 'createdAt': FieldValue.serverTimestamp(),

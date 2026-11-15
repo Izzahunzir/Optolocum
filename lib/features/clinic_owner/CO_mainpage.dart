@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:optolocum/services/job_service.dart';
 
@@ -13,9 +14,19 @@ import 'CO_postingjob.dart';
 
 /// Homepage for verified clinic owners. Pass false behind the verification prompt.
 class COMainPage extends StatefulWidget {
-  const COMainPage({super.key, this.isVerified, this.jobsStream});
+  const COMainPage({
+    super.key,
+    this.isVerified,
+    this.jobsStream,
+    this.jobService,
+    this.auth,
+    this.activityAuthStream,
+  });
 
   final Stream<List<COJobPosting>>? jobsStream;
+  final JobService? jobService;
+  final FirebaseAuth? auth;
+  final Stream<User?>? activityAuthStream;
 
   /// Optional preview override. Live pages follow account verification status.
   final bool? isVerified;
@@ -25,12 +36,13 @@ class COMainPage extends StatefulWidget {
 }
 
 class _COMainPageState extends State<COMainPage> {
+  late final JobService _jobService = widget.jobService ?? JobService();
   final _search = TextEditingController();
   bool _searchOpen = false;
   bool _newestFirst = true;
   late final _jobsStream =
       widget.jobsStream ??
-      JobService().getMyJobs().map(
+      _jobService.getMyJobs().map(
         (snapshot) => snapshot.docs
             .map((doc) => jobFromFirestore(doc.data(), jobId: doc.id))
             .toList(),
@@ -43,12 +55,6 @@ class _COMainPageState extends State<COMainPage> {
   }
 
   static const _blue = Color(0xFF3B4E92);
-
-  void _comingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('$feature is coming soon.')));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +82,7 @@ class _COMainPageState extends State<COMainPage> {
 
             return _buildPage(
               context,
-              widget.isVerified ?? status == COVerificationStatus.verified,
+              widget.isVerified ?? status == COVerificationStatus.approved,
               jobs,
             );
           },
@@ -282,7 +288,7 @@ class _COMainPageState extends State<COMainPage> {
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute<void>(
-                          builder: (_) => const COPostingJob(),
+                          builder: (_) => COPostingJob(jobService: _jobService),
                         ),
                       ),
                       style: IconButton.styleFrom(
@@ -302,7 +308,9 @@ class _COMainPageState extends State<COMainPage> {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute<void>(
-                      builder: (_) => const COLocumActivity(),
+                      builder: (_) => COLocumActivity(
+                        authStream: widget.activityAuthStream,
+                      ),
                     ),
                   ),
                 ),
@@ -311,7 +319,9 @@ class _COMainPageState extends State<COMainPage> {
                   icon: Icons.account_circle_outlined,
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute<void>(builder: (_) => const COProfile()),
+                    MaterialPageRoute<void>(
+                      builder: (_) => COProfile(auth: widget.auth),
+                    ),
                   ),
                 ),
               ],

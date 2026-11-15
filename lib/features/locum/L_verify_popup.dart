@@ -1,12 +1,21 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:optolocum/services/locum_profile_service.dart';
 
 import 'L_mainpage.dart';
 import 'L_verification_form.dart';
 
 class LVerifyPopup extends StatefulWidget {
-  const LVerifyPopup({super.key, this.displayName = 'Locum'});
+  const LVerifyPopup({
+    super.key,
+    this.displayName = 'Locum',
+    this.jobsStream,
+    this.profileService,
+  });
   final String displayName;
+  final Stream<QuerySnapshot<Map<String, dynamic>>>? jobsStream;
+  final LocumProfileService? profileService;
 
   @override
   State<LVerifyPopup> createState() => _LVerifyPopupState();
@@ -91,6 +100,7 @@ class _LVerifyPopupState extends State<LVerifyPopup> {
                           MaterialPageRoute<void>(
                             builder: (_) => LVerificationForm(
                               displayName: widget.displayName,
+                              profileService: widget.profileService,
                             ),
                           ),
                         );
@@ -108,5 +118,8 @@ class _LVerifyPopupState extends State<LVerifyPopup> {
   }
 
   @override
-  Widget build(BuildContext context) => const LMainPage();
+  Widget build(BuildContext context) => LMainPage(
+    jobsStream: widget.jobsStream,
+    profileService: widget.profileService,
+  );
 }

@@ -57,6 +57,7 @@ class COLocumActivity extends StatelessWidget {
     super.key,
     this.jobId,
     this.clinicOwnerId,
+    this.authStream,
     this.applications = const [],
     this.onApprove,
     this.onReject,
@@ -66,6 +67,7 @@ class COLocumActivity extends StatelessWidget {
   // owner; supplied applications and action callbacks are not used.
   final String? jobId;
   final String? clinicOwnerId;
+  final Stream<User?>? authStream;
   final List<COLocumApplication> applications;
 
   /// Reserved for future backend integration; all actions remain disabled.
@@ -73,7 +75,7 @@ class COLocumActivity extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => StreamBuilder<User?>(
-    stream: FirebaseAuth.instance.authStateChanges(),
+    stream: authStream ?? FirebaseAuth.instance.authStateChanges(),
     builder: (context, auth) {
       if (auth.hasError) {
         return _page(context, error: 'Unable to verify your session.');
@@ -589,10 +591,7 @@ class _ApplicationCard extends StatelessWidget {
             children: [
               const Text(
                 'Locum Details',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
               Text('Full Name: ${applicant.name}'),
@@ -601,10 +600,7 @@ class _ApplicationCard extends StatelessWidget {
               const SizedBox(height: 12),
               const Text(
                 'Account Verification',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 8),
               Row(
@@ -613,21 +609,21 @@ class _ApplicationCard extends StatelessWidget {
                     applicant.verificationStatus == 'verified'
                         ? Icons.verified
                         : applicant.verificationStatus == 'pending'
-                            ? Icons.access_time
-                            : Icons.info_outline,
+                        ? Icons.access_time
+                        : Icons.info_outline,
                     color: applicant.verificationStatus == 'verified'
                         ? Colors.green
                         : applicant.verificationStatus == 'pending'
-                            ? Colors.orange
-                            : Colors.grey,
+                        ? Colors.orange
+                        : Colors.grey,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     applicant.verificationStatus == 'verified'
                         ? 'Verified'
                         : applicant.verificationStatus == 'pending'
-                            ? 'Pending Verification'
-                            : 'Unverified',
+                        ? 'Pending Verification'
+                        : 'Unverified',
                   ),
                 ],
               ),
@@ -642,10 +638,7 @@ class _ApplicationCard extends StatelessWidget {
               const SizedBox(height: 12),
               const Text(
                 'Qualification information is self-reported and has not been independently verified.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
           ),
@@ -912,33 +905,30 @@ Widget build(BuildContext context) {
                     ),
                   ),
                 ],
-              )
-
-            // Current: Mark as Completed
-            else if (applicant.status ==
-                COLocumActivityStatus.current)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: hasJobEnded
-                        ? () => _updateApplicationStatus(
-                              context,
-                              'completed',
-                            )
-                        : null,
-                    icon: const Icon(Icons.task_alt),
-                    label: const Text('Mark as Completed'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF00A83B),
-                      side: BorderSide(
-                        color: hasJobEnded
-                            ? const Color(0xFF00A83B)
-                            : Colors.grey.shade300,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(5),
-                      ),
+              ),
+              const SizedBox(height: 28),
+              detail(
+                Icons.calendar_today_outlined,
+                'Job Date',
+                applicant.jobDate,
+              ),
+              detail(Icons.access_time, 'Time', applicant.time),
+              detail(
+                Icons.location_on_outlined,
+                'Location',
+                applicant.location,
+              ),
+              detail(
+                Icons.description_outlined,
+                'Position',
+                applicant.position,
+              ),
+              const SizedBox(height: 8),
+              if (applicant.status == COLocumActivityStatus.pending)
+                Row(
+                  children: [
+                    Expanded(
+                      child: action('Reject', Icons.close, Colors.red, null),
                     ),
                   ),
 
@@ -954,21 +944,19 @@ Widget build(BuildContext context) {
                         textAlign: TextAlign.center,
                       ),
                     ),
-                ],
-              )
-
-            // Completed / Rejected
-            else
-              action(
-                'Message',
-                Icons.chat_bubble_outline,
-                const Color(0xFF263C80),
-                null,
-              ),
-          ],
+                  ],
+                )
+              else
+                action(
+                  'Message',
+                  Icons.chat_bubble_outline,
+                  const Color(0xFF263C80),
+                  null,
+                ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

@@ -10,7 +10,6 @@ import 'CO_mainpage.dart';
 import 'CO_profile.dart';
 import 'CO_locum_activity.dart';
 
-/// Session-only posting data. Replace with account-scoped persistence later.
 class COJobPosting {
   const COJobPosting({
     this.jobId,
@@ -49,8 +48,6 @@ class COJobPosting {
   final String status;
   bool get isAvailable => status == 'available';
 }
-
-final coJobPostings = ValueNotifier<List<COJobPosting>>(const []);
 
 COJobPosting jobFromFirestore(Map<String, dynamic> data, {String? jobId}) {
   TimeOfDay parseTime(String value) {
@@ -91,15 +88,43 @@ COJobPosting jobFromFirestore(Map<String, dynamic> data, {String? jobId}) {
 }
 
 class COPostingJob extends StatefulWidget {
-  const COPostingJob({super.key});
+  const COPostingJob({super.key, this.jobService, this.jobsStream});
+
+  final JobService? jobService;
+  final Stream<List<COJobPosting>>? jobsStream;
 
   @override
   State<COPostingJob> createState() => _COPostingJobState();
 }
 
 class _COPostingJobState extends State<COPostingJob> {
+  late final JobService _jobService = widget.jobService ?? JobService();
+  late Stream<List<COJobPosting>> _jobsStream;
   bool _justPosted = false;
   Timer? _successTimer;
+
+  Stream<List<COJobPosting>> _createJobsStream() =>
+      widget.jobsStream ??
+      _jobService.getMyJobs().map(
+        (snapshot) => snapshot.docs
+            .map((doc) => jobFromFirestore(doc.data(), jobId: doc.id))
+            .toList(),
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    _jobsStream = _createJobsStream();
+  }
+
+  @override
+  void didUpdateWidget(covariant COPostingJob oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.jobsStream != widget.jobsStream ||
+        oldWidget.jobService != widget.jobService) {
+      _jobsStream = _createJobsStream();
+    }
+  }
 
   @override
   void dispose() {
@@ -111,57 +136,17 @@ class _COPostingJobState extends State<COPostingJob> {
     final posting = await showDialog<COJobPosting>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const _PostingForm(),
+      builder: (_) => _PostingForm(jobService: _jobService),
     );
 
     if (posting == null || !mounted) return;
 
-    try {
-      final service = JobService();
-
-      String formatTime(TimeOfDay time) {
-        return '${time.hour.toString().padLeft(2, '0')}:'
-            '${time.minute.toString().padLeft(2, '0')}';
-      }
-
-      await service.createJob(
-        placeName: posting.placeName,
-        location: posting.location,
-        role: posting.role,
-        vacancies: posting.vacancies,
-        jobDate: posting.date,
-        startTime: formatTime(posting.start),
-        endTime: formatTime(posting.end),
-        payRate: posting.pay,
-        payRateUnit: posting.payUnit.toLowerCase().replaceAll(' ', '_'),
-        jobDescription: posting.description,
-        contactPerson: posting.contactPerson,
-        contactNumber: posting.contactNumber,
-      );
-
-      if (!mounted) return;
-
-      coJobPostings.value = List.unmodifiable([
-        ...coJobPostings.value,
-        posting,
-      ]);
-
-      setState(() => _justPosted = true);
-
-      _successTimer?.cancel();
-      _successTimer = Timer(const Duration(milliseconds: 800), () {
-        if (mounted) setState(() => _justPosted = false);
-      });
-    } catch (e) {
-      if (!context.mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to post job: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    if (!mounted) return;
+    setState(() => _justPosted = true);
+    _successTimer?.cancel();
+    _successTimer = Timer(const Duration(milliseconds: 800), () {
+      if (mounted) setState(() => _justPosted = false);
+    });
   }
 
   @override
@@ -177,8 +162,8 @@ class _COPostingJobState extends State<COPostingJob> {
       backgroundColor: const Color(0xFF3B4E92),
       foregroundColor: Colors.white,
     ),
-    body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: JobService().getMyJobs(),
+    body: StreamBuilder<List<COJobPosting>>(
+      stream: _jobsStream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(child: Text('Failed to load jobs: ${snapshot.error}'));
@@ -188,9 +173,7 @@ class _COPostingJobState extends State<COPostingJob> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final jobs = snapshot.data!.docs
-            .map((doc) => jobFromFirestore(doc.data(), jobId: doc.id))
-            .toList();
+        final jobs = snapshot.data!;
 
         return LayoutBuilder(
           builder: (context, constraints) => SingleChildScrollView(
@@ -608,7 +591,9 @@ class COPostedJobCard extends StatelessWidget {
 }
 
 class _PostingForm extends StatefulWidget {
-  const _PostingForm();
+  const _PostingForm({required this.jobService});
+
+  final JobService jobService;
   @override
   State<_PostingForm> createState() => _PostingFormState();
 }
@@ -622,6 +607,8 @@ class _PostingFormState extends State<_PostingForm> {
   DateTime? _date;
   TimeOfDay? _start, _end;
   String _unit = 'Per hour';
+  bool _saving = false;
+  String? _saveError;
 
   @override
   void dispose() {
@@ -744,26 +731,55 @@ class _PostingFormState extends State<_PostingForm> {
     }
   }
 
-  void submit() {
-    if (!_key.currentState!.validate()) return;
+  Future<void> submit() async {
+    if (_saving || !_key.currentState!.validate()) return;
     _key.currentState!.save();
-    Navigator.pop(
-      context,
-      COJobPosting(
-        placeName: _values['Place Name']!,
-        location: _values['Location']!,
-        role: _values['Role']!,
-        vacancies: int.parse(_values['Number of Vacancies']!),
-        date: _date!,
-        start: _start!,
-        end: _end!,
-        pay: double.parse(_values['Pay Rate']!),
-        payUnit: _unit,
-        description: _values['Basic Job Description']!,
-        contactPerson: _values['Contact Person']!,
-        contactNumber: _values['Contact Number']!,
-      ),
+    final posting = COJobPosting(
+      placeName: _values['Place Name']!,
+      location: _values['Location']!,
+      role: _values['Role']!,
+      date: _date!,
+      start: _start!,
+      end: _end!,
+      pay: double.parse(_values['Pay Rate']!),
+      payUnit: _unit,
+      description: _values['Basic Job Description']!,
+      contactPerson: _values['Contact Person']!,
+      contactNumber: _values['Contact Number']!,
     );
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+    String formatTime(TimeOfDay time) =>
+        '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    try {
+      await widget.jobService.createJob(
+        placeName: posting.placeName,
+        location: posting.location,
+        role: posting.role,
+        jobDate: posting.date,
+        startTime: formatTime(posting.start),
+        endTime: formatTime(posting.end),
+        payRate: posting.pay,
+        payRateUnit: switch (_unit) {
+          'Per hour' => 'per_hour',
+          'Per day' => 'per_day',
+          'Per shift' => 'per_shift',
+          _ => throw StateError('Unsupported rate unit'),
+        },
+        jobDescription: posting.description,
+        contactPerson: posting.contactPerson,
+        contactNumber: posting.contactNumber,
+      );
+      if (mounted) Navigator.pop(context, posting);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _saveError = 'Failed to post job. Please try again.';
+      });
+    }
   }
 
   @override
@@ -794,7 +810,7 @@ class _PostingFormState extends State<_PostingForm> {
                   ),
                   IconButton(
                     tooltip: 'Close job form',
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _saving ? null : () => Navigator.pop(context),
                     icon: const Icon(Icons.close),
                   ),
                 ],
@@ -911,25 +927,35 @@ class _PostingFormState extends State<_PostingForm> {
                 icon: Icons.phone_outlined,
                 type: TextInputType.phone,
               ),
+              if (_saveError != null) ...[
+                const SizedBox(height: 8),
+                Text(_saveError!, style: const TextStyle(color: Colors.red)),
+              ],
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: _saving ? null : () => Navigator.pop(context),
                       child: const Text('Cancel'),
                     ),
                   ),
                   const SizedBox(width: 24),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: submit,
+                      onPressed: _saving ? null : submit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF263C80),
                         foregroundColor: Colors.white,
                       ),
                       icon: const Icon(Icons.send_outlined, size: 18),
-                      label: const Text('Post Job'),
+                      label: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Post Job'),
                     ),
                   ),
                 ],

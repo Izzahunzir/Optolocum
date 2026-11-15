@@ -5,10 +5,14 @@ import 'package:flutter/material.dart';
 import 'CO_header.dart';
 import 'CO_signup.dart';
 import '../clinic_owner/CO_verify_popup.dart';
+import '../clinic_owner/CO_postingjob.dart';
 import '../clinic_owner/CO_forgotpass.dart';
 
 class CompanyOwnerSigninPage extends StatefulWidget {
-  const CompanyOwnerSigninPage({super.key});
+  const CompanyOwnerSigninPage({super.key, this.authService, this.jobsStream});
+
+  final AuthService? authService;
+  final Stream<List<COJobPosting>>? jobsStream;
 
   @override
   State<CompanyOwnerSigninPage> createState() => _CompanyOwnerSigninPageState();
@@ -34,13 +38,16 @@ class _CompanyOwnerSigninPageState extends State<CompanyOwnerSigninPage> {
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
     try {
-      await AuthService().signIn(
+      await (widget.authService ?? AuthService()).signIn(
         email: emailController.text,
         password: passwordController.text,
       );
       if (!mounted) return;
-      Navigator.of(context)
-          .push(MaterialPageRoute<void>(builder: (_) => const COVerifyPopup()));
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => COVerifyPopup(jobsStream: widget.jobsStream),
+        ),
+      );
     } on FirebaseAuthException catch (e) {
       debugPrint('Login failed: ${e.code}');
       if (!mounted) return;

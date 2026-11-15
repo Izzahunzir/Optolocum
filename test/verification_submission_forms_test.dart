@@ -75,12 +75,20 @@ Future<void> _openLocum(
   await tester.pumpAndSettle();
 }
 
-Future<void> _fillPractice(WidgetTester tester) async {
+Future<void> _fillPractice(
+  WidgetTester tester, {
+  bool selectDocument = true,
+}) async {
   tester.view.physicalSize = const Size(800, 1400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpAndSettle();
+  if (selectDocument) {
+    await tester.ensureVisible(find.text('Choose one document'));
+    await tester.tap(find.text('Choose one document'));
+    await tester.pumpAndSettle();
+  }
   for (final entry in [
     ('practice-type', 'Retail Optical Store'),
     ('malaysian-state', 'Johor'),
@@ -135,6 +143,7 @@ void main() {
     name: name,
     path: name,
   );
+  Future<XFile?> pickOwnerDocument() async => file('ssm.pdf');
 
   testWidgets('Practice Owner account switch blocks stale form submission', (
     tester,
@@ -143,7 +152,11 @@ void main() {
     String? uid = 'owner';
     await tester.pumpWidget(
       MaterialApp(
-        home: COVerificationForm(submissions: client, currentUid: () => uid),
+        home: COVerificationForm(
+          submissions: client,
+          currentUid: () => uid,
+          pickDocument: pickOwnerDocument,
+        ),
       ),
     );
     await _fillPractice(tester);
@@ -155,6 +168,28 @@ void main() {
       find.text('Your account changed. Please reopen the form.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('Practice Owner cannot submit without required SSM document', (
+    tester,
+  ) async {
+    final client = _Client();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: COVerificationForm(
+          submissions: client,
+          currentUid: () => 'owner',
+        ),
+      ),
+    );
+    await _fillPractice(tester, selectDocument: false);
+    await tester.tap(find.text('Verify Account'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Choose one SSM certificate or Company Profile document.'),
+      findsOneWidget,
+    );
+    expect(client.received, isEmpty);
   });
 
   testWidgets('Locum requires one document and replaces previous selection', (
@@ -266,13 +301,14 @@ void main() {
           home: COVerificationForm(
             submissions: client,
             currentUid: () => 'owner',
+            pickDocument: pickOwnerDocument,
           ),
         ),
       );
       await _fillPractice(tester);
       await tester.tap(find.text('Verify Account'));
       await tester.pump();
-      expect(client.received.single.document, isNull);
+      expect(client.received.single.document!.name, 'ssm.pdf');
       expect(client.received.single.fields, {
         'practiceType': 'Retail Optical Store',
         'clinicName': 'Vision Clinic',
@@ -283,7 +319,9 @@ void main() {
         'companyEmail': 'clinic@example.com',
       });
       expect(
-        find.text('Your practice details have been submitted for review.'),
+        find.text(
+          'Your details and SSM document have been submitted for review.',
+        ),
         findsNothing,
       );
       expect(
@@ -293,7 +331,9 @@ void main() {
       client.pending!.complete();
       await tester.pumpAndSettle();
       expect(
-        find.text('Your practice details have been submitted for review.'),
+        find.text(
+          'Your details and SSM document have been submitted for review.',
+        ),
         findsOneWidget,
       );
     },
@@ -307,6 +347,7 @@ void main() {
         home: COVerificationForm(
           submissions: client,
           currentUid: () => 'owner',
+          pickDocument: pickOwnerDocument,
         ),
       ),
     );
@@ -314,7 +355,9 @@ void main() {
     await tester.tap(find.text('Verify Account'));
     await tester.pumpAndSettle();
     expect(
-      find.text('Your practice details have been submitted for review.'),
+      find.text(
+        'Your details and SSM document have been submitted for review.',
+      ),
       findsNothing,
     );
     client.fail = false;
@@ -322,7 +365,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(client.received[0].id, client.received[1].id);
     expect(
-      find.text('Your practice details have been submitted for review.'),
+      find.text(
+        'Your details and SSM document have been submitted for review.',
+      ),
       findsOneWidget,
     );
   });

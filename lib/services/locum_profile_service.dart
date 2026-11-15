@@ -53,7 +53,8 @@ class LocumProfileService {
     locumProfileData.value = profile;
     locumVerificationStatus.value = switch (profile?.verificationStatus) {
       'pending' => LocumVerificationStatus.pending,
-      'verified' => LocumVerificationStatus.verified,
+      'approved' || 'verified' => LocumVerificationStatus.approved,
+      'rejected' => LocumVerificationStatus.rejected,
       _ => LocumVerificationStatus.unverified,
     };
   }
@@ -106,9 +107,22 @@ class LocumProfileService {
     if (profile.verificationStatus != 'pending') {
       throw ArgumentError('Profile submissions must remain pending.');
     }
+    final priorStatus = locumProfileData.value?.uid == profile.uid
+        ? locumProfileData.value!.verificationStatus
+        : null;
     await LocumProfileStore(_firestore).save(profile);
     _checkAccount(profile.uid, generation);
-    _cache(profile);
+    _cache(
+      LocumProfileData(
+        uid: profile.uid,
+        fields: profile.fields,
+        documents: profile.documents,
+        verificationStatus:
+            priorStatus == 'approved' || priorStatus == 'verified'
+            ? priorStatus!
+            : profile.verificationStatus,
+      ),
+    );
     _refreshApplicantSummaries(profile.uid);
   }
 

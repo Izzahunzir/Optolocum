@@ -117,6 +117,17 @@ void main() {
   );
 
   test(
+    'editing an approved legacy profile does not overwrite approval status',
+    () async {
+      when(() => snapshot.exists).thenReturn(true);
+      when(() => snapshot.data())
+          .thenReturn({'verificationStatus': 'verified'});
+      await LocumProfileStore(firestore).save(profile);
+      expect(writes.single.containsKey('verificationStatus'), isFalse);
+    },
+  );
+
+  test(
     'transaction retry rechecks existence after a competing creation',
     () async {
       when(() => snapshot.exists).thenReturn(false);

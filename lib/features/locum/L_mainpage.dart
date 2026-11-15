@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:optolocum/services/job_service.dart';
 import 'package:optolocum/services/locum_profile_service.dart';
@@ -20,9 +21,16 @@ export 'L_profile_data.dart'
     show LocumVerificationStatus, locumVerificationStatus;
 
 class LMainPage extends StatefulWidget {
-  const LMainPage({super.key, this.jobsStream});
+  const LMainPage({
+    super.key,
+    this.jobsStream,
+    this.profileService,
+    this.pickVerificationDocument,
+  });
 
   final Stream<QuerySnapshot<Map<String, dynamic>>>? jobsStream;
+  final LocumProfileService? profileService;
+  final Future<XFile?> Function()? pickVerificationDocument;
 
   @override
   State<LMainPage> createState() => _LMainPageState();
@@ -99,6 +107,8 @@ class _LMainPageState extends State<LMainPage> {
                         : LContactUs(onBack: _closeAccountPage),
                   )
                 : LProfile(
+                    profileService: widget.profileService,
+                    pickDocument: widget.pickVerificationDocument,
                     onLogout: _logout,
                     onContactUs: () => setState(() => _showContactUs = true),
                     onSavedJobs: () => setState(() => _showSavedJobs = true),
@@ -186,6 +196,10 @@ class _LMainPageState extends State<LMainPage> {
                               );
                             }
                             if (!snapshot.hasData) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.done) {
+                                return const Text('No jobs available');
+                              }
                               return const Center(
                                 child: CircularProgressIndicator(),
                               );
@@ -254,6 +268,13 @@ class _LMainPageState extends State<LMainPage> {
                             padding: EdgeInsets.only(top: 20),
                             child: Text(
                               'Your account verification is pending review.',
+                            ),
+                          ),
+                        if (status == LocumVerificationStatus.rejected)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 20),
+                            child: Text(
+                              'Your account verification needs attention. Update your details and documents, then submit again.',
                             ),
                           ),
                       ]

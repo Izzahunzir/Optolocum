@@ -1,7 +1,7 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 
-enum LocumVerificationStatus { unverified, pending, verified }
+enum LocumVerificationStatus { unverified, pending, approved, rejected }
 
 /// Set verified only from persisted backend review results.
 final locumVerificationStatus = ValueNotifier(
@@ -45,9 +45,12 @@ class LocumProfileData {
             ? data[entry.value] as String
             : '',
     },
-    verificationStatus: data['verificationStatus'] is String
-        ? data['verificationStatus'] as String
-        : 'unverified',
+    verificationStatus: switch (data['verificationStatus']) {
+      'verified' || 'approved' => 'approved',
+      'pending' => 'pending',
+      'rejected' => 'rejected',
+      _ => 'unverified',
+    },
     documents: const [],
   );
 

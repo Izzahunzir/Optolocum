@@ -9,9 +9,9 @@ service firebase.storage {
     }
     match /verification_documents/{uid}/{id}/document {
       allow get: if (owner(uid) || admin())
-        && revision(uid,id).accountType == 'locum';
+        && revision(uid,id).accountType in ['locum','practice_owner'];
       allow create: if resource == null && owner(uid) && id.matches('^[a-f0-9]{40}$')
-        && revision(uid,id).uid == uid && revision(uid,id).accountType == 'locum'
+        && revision(uid,id).uid == uid && revision(uid,id).accountType in ['locum','practice_owner']
         && revision(uid,id).state == 'draft'
         && revision(uid,id).document.path == 'verification_documents/' + uid + '/' + id + '/document'
         && request.resource.size > 0 && request.resource.size <= 50 * 1024 * 1024
