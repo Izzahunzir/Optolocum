@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'firebase_options.dart';
 import 'features/intro/intro_page.dart';
+import 'services/verification_status_sync.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  VerificationStatusSync(
+    FirebaseAuth.instance,
+    FirebaseFirestore.instance,
+  ).start();
 
   runApp(const MyApp());
 }

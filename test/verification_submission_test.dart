@@ -202,27 +202,24 @@ void main() {
     );
     expect(saved, false);
   });
-  test(
-    'Locum success waits for reserve, upload, profile and final commit',
-    () async {
-      final repo = MemoryRepository();
-      final s = locum();
-      await VerificationSubmissionService(repo).submit(
-        s,
-        saveProfile: () async {
-          repo.events.add('profile');
-        },
-      );
-      expect(repo.events, [
-        'reserve',
-        'upload',
-        'profile',
-        'finalize',
-        'afterCommit',
-      ]);
-      expect(repo.records[s.id]!['state'], 'submitted');
-    },
-  );
+  test('Locum saves the profile after the submission commits', () async {
+    final repo = MemoryRepository();
+    final s = locum();
+    await VerificationSubmissionService(repo).submit(
+      s,
+      saveProfile: () async {
+        repo.events.add('profile');
+      },
+    );
+    expect(repo.events, [
+      'reserve',
+      'upload',
+      'finalize',
+      'afterCommit',
+      'profile',
+    ]);
+    expect(repo.records[s.id]!['state'], 'submitted');
+  });
   test(
     'Practice Owner persists exact fields and uploads required document',
     () async {
@@ -256,27 +253,24 @@ void main() {
       },
     );
   }
-  test(
-    'profile failure cannot finalize; completed upload is retained for retry',
-    () async {
-      final repo = MemoryRepository();
-      final service = VerificationSubmissionService(repo);
-      final s = locum();
-      await expectLater(
-        service.submit(
-          s,
-          saveProfile: () async {
-            throw StateError('profile failed');
-          },
-        ),
-        throwsStateError,
-      );
-      expect(repo.records[s.id]!['state'], 'draft');
-      expect(repo.events, isNot(contains('finalize')));
-      await service.submit(s, saveProfile: () async {});
-      expect(repo.uploads.length, 1);
-    },
-  );
+  test('profile failure retains the submitted revision for retry', () async {
+    final repo = MemoryRepository();
+    final service = VerificationSubmissionService(repo);
+    final s = locum();
+    await expectLater(
+      service.submit(
+        s,
+        saveProfile: () async {
+          throw StateError('profile failed');
+        },
+      ),
+      throwsStateError,
+    );
+    expect(repo.records[s.id]!['state'], 'submitted');
+    expect(repo.events, contains('finalize'));
+    await service.submit(s, saveProfile: () async {});
+    expect(repo.uploads.length, 1);
+  });
   test('account mismatch rejects before any persistence', () async {
     final repo = MemoryRepository()..currentUid = 'other';
     await expectLater(
@@ -285,7 +279,7 @@ void main() {
     );
     expect(repo.events, isEmpty);
   });
-  test('account switch during profile save blocks finalization', () async {
+  test('account switch during profile save is reported', () async {
     final repo = MemoryRepository();
     await expectLater(
       VerificationSubmissionService(repo).submit(
@@ -296,7 +290,7 @@ void main() {
       ),
       throwsStateError,
     );
-    expect(repo.events, isNot(contains('finalize')));
+    expect(repo.events, contains('finalize'));
   });
   test('new revisions do not mutate previously submitted evidence', () async {
     final repo = MemoryRepository();

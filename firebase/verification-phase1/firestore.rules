@@ -52,12 +52,8 @@ service cloud.firestore {
         && request.resource.data.state == 'draft'
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
-      // The only client transition. Evidence and timestamps cannot be replaced.
-      allow update: if owner(uid) && resource.data.state == 'draft'
-        && request.resource.data.state == 'submitted'
-        && request.resource.data.submittedAt == request.time
-        && request.resource.data.updatedAt == request.time
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state','submittedAt','updatedAt']);
+      // Only a trusted backend may finalize or review an immutable revision.
+      allow update: if false;
       allow delete: if false;
     }
     match /verification_submissions/{uid} { allow read, write: if false; }

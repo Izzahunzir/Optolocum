@@ -189,24 +189,15 @@ class _LVerificationFormState extends State<LVerificationForm> {
         document: await VerificationDocument.fromFile(_documents.single),
       );
       if (_attempt?.fingerprint != candidate.fingerprint) _attempt = candidate;
-      final submissionsDisabled =
-          widget.submissions is DisabledVerificationSubmissions;
-      if (submissionsDisabled) {
-        // Preserve the existing profile-only workflow until deployment approval.
-        await _service.save(profile);
-      } else {
-        await widget.submissions.submit(
-          _attempt!,
-          saveProfile: () => _service.save(profile),
-        );
-      }
+      await widget.submissions.submit(
+        _attempt!,
+        saveProfile: () => _service.save(profile),
+      );
       if (!mounted || _accountChanged || _service.currentUid != uid) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            submissionsDisabled
-                ? 'Profile saved. Your document has not been uploaded or submitted for verification.'
-                : 'Your details and document have been submitted for review.',
+            'Your details and document have been submitted for review.',
           ),
         ),
       );

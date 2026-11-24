@@ -71,19 +71,16 @@ class COAccountVerification extends StatelessWidget {
                       color: Color(0xFF666666),
                     ),
                   ),
-                  if (status == COVerificationStatus.unverified ||
-                      status == COVerificationStatus.rejected) ...[
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => const COVerificationForm(),
-                        ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => const COVerificationForm(),
                       ),
-                      child: const Text('Complete Your Profile'),
                     ),
-                  ],
+                    child: const Text('Complete Your Profile'),
+                  ),
                 ],
               ),
             ),

@@ -35,9 +35,9 @@ class VerificationSubmissionService implements VerificationSubmissionClient {
     _check(submission.uid);
     if (submission.document != null) await repository.upload(submission);
     _check(submission.uid);
-    if (saveProfile != null) await saveProfile();
-    _check(submission.uid);
     await repository.finalize(submission);
+    _check(submission.uid);
+    if (saveProfile != null) await saveProfile();
     _check(submission.uid);
   }
 }
@@ -45,10 +45,16 @@ class VerificationSubmissionService implements VerificationSubmissionClient {
 /// No production factory in Phase 1. All three SDKs use the same demo app and
 /// loopback emulators. Creating this repository cannot target live Firebase.
 class FirebaseVerificationRepository implements VerificationRepository {
-  FirebaseVerificationRepository._(this._firestore, this._auth, this._storage);
+  FirebaseVerificationRepository._(
+    this._firestore,
+    this._auth,
+    this._storage,
+    this._trustedFinalize,
+  );
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
   final FirebaseStorage _storage;
+  final Future<void> Function(VerificationSubmission)? _trustedFinalize;
 
   static Future<FirebaseVerificationRepository> emulator({
     required FirebaseApp app,
@@ -56,6 +62,7 @@ class FirebaseVerificationRepository implements VerificationRepository {
     int firestorePort = 8188,
     int authPort = 9198,
     int storagePort = 9298,
+    Future<void> Function(VerificationSubmission)? trustedFinalize,
   }) async {
     if (!app.options.projectId.startsWith('demo-') ||
         !['127.0.0.1', 'localhost', '10.0.2.2'].contains(host)) {
@@ -70,7 +77,12 @@ class FirebaseVerificationRepository implements VerificationRepository {
     firestore.useFirestoreEmulator(host, firestorePort);
     await auth.useAuthEmulator(host, authPort);
     await storage.useStorageEmulator(host, storagePort);
-    return FirebaseVerificationRepository._(firestore, auth, storage);
+    return FirebaseVerificationRepository._(
+      firestore,
+      auth,
+      storage,
+      trustedFinalize,
+    );
   }
 
   @override
@@ -170,18 +182,11 @@ class FirebaseVerificationRepository implements VerificationRepository {
   @override
   Future<void> finalize(VerificationSubmission s) async {
     _check(s);
-    await _firestore.runTransaction<void>((tx) async {
-      final existing = await tx.get(_ref(s));
-      _check(s);
-      if (!existing.exists) throw StateError('Submission draft is missing.');
-      final data = existing.data()!;
-      _same(s, data);
-      if (data['state'] == 'submitted') return; // Uncertain commit: safe retry.
-      tx.update(_ref(s), {
-        'state': 'submitted',
-        'submittedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    });
+    final finalize = _trustedFinalize;
+    if (finalize == null) {
+      throw StateError('Trusted verification finalization is unavailable.');
+    }
+    await finalize(s);
+    _check(s);
   }
 }

@@ -26,6 +26,8 @@ const draft = (uid = 'locum', revisionId = id) => ({
 const metadata = { contentType: 'application/pdf', customMetadata: { sha256: hash } };
 const create = async (uid = 'locum', revisionId = id) => setDoc(revision(db(uid), uid, revisionId), draft(uid, revisionId));
 const submit = async (uid = 'locum', revisionId = id) => updateDoc(revision(db(uid), uid, revisionId), { state: 'submitted', submittedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+const trustedSubmit = async (uid = 'locum', revisionId = id) => env.withSecurityRulesDisabled(async context =>
+  updateDoc(revision(context.firestore(), uid, revisionId), { state: 'submitted', submittedAt: serverTimestamp(), updatedAt: serverTimestamp() }));
 
 before(async () => {
   // Refuse execution without the exact isolated emulator endpoints.
@@ -54,7 +56,8 @@ after(async () => { if (env) await env.cleanup(); });
 test('Locum draft, private upload and immutable submitted revision', async () => {
   await assertSucceeds(create());
   await assertSucceeds(uploadBytes(ref(storage('locum'), path), bytes, metadata));
-  await assertSucceeds(submit());
+  await assertFails(submit());
+  await trustedSubmit();
   const saved = await getDoc(revision(db('locum')));
   assert.equal(saved.data().state, 'submitted');
   await assertFails(updateDoc(revision(db('locum')), { 'submittedFields.fullName': 'Changed' }));
@@ -64,9 +67,11 @@ test('Locum draft, private upload and immutable submitted revision', async () =>
 test('Practice Owner submits details and private document; resubmission creates a new revision', async () => {
   await assertSucceeds(create('owner'));
   await assertSucceeds(uploadBytes(ref(storage('owner'), `verification_documents/owner/${id}/document`), bytes, metadata));
-  await assertSucceeds(submit('owner'));
+  await assertFails(submit('owner'));
+  await trustedSubmit('owner');
   await assertSucceeds(create('owner', secondId));
-  await assertSucceeds(updateDoc(revision(db('owner'), 'owner', secondId), {state:'submitted', submittedAt:serverTimestamp(), updatedAt:serverTimestamp()}));
+  await assertFails(submit('owner', secondId));
+  await trustedSubmit('owner', secondId);
   assert.equal((await getDocs(collection(db('owner'), 'verification_submissions/owner/revisions'))).size, 2);
 });
 test('users cannot read/list/write another user submission; anonymous denied', async () => {
@@ -107,7 +112,7 @@ test('invalid fields, schema, UID, timestamps, and document metadata rejected', 
   ]) await assertFails(setDoc(revision(db('locum')), {...draft(), ...patch}));
   const noDoc = draft(); delete noDoc.document;
   await assertFails(setDoc(revision(db('locum')), noDoc));
-  await assertFails(setDoc(revision(db('owner'), 'owner'), {...draft('owner'), document:{...draft().document, path:`verification_documents/owner/${id}/document`}}));
+  await assertFails(setDoc(revision(db('owner'), 'owner'), {...draft('owner'), document:{...draft().document, path:`verification_documents/locum/${id}/document`}}));
 });
 test('finalization must use server timestamp and correct transition', async () => {
   await create();
@@ -146,7 +151,7 @@ test('Storage is private, create-only, and cannot be uploaded after submission',
   await assertFails(uploadBytes(own, bytes, metadata));
   await assertFails(updateMetadata(own, {customMetadata:{sha256:'forged'}}));
   await assertFails(deleteObject(own));
-  await submit();
+  await trustedSubmit();
   await assertFails(uploadBytes(own, bytes, metadata));
   await assertFails(deleteObject(ref(storage('admin', {admin:true}), path)));
 });
@@ -157,11 +162,8 @@ test('both account types can only read their own private uploads', async () => {
   await assertSucceeds(getBytes(ownerFile));
   await assertFails(getBytes(ref(storage('other'), `verification_documents/owner/${id}/document`)));
 });
-test('submitted without upload is untrusted evidence, never an approval', async () => {
-  // Firestore rules cannot inspect Storage. Phase 2 review must validate the
-  // actual object before approval; this test documents that boundary explicitly.
+test('client cannot submit without uploaded evidence', async () => {
   await create();
-  await assertSucceeds(submit());
-  await assertFails(uploadBytes(ref(storage('locum'), path), bytes, metadata));
-  assert.equal((await getDoc(revision(db('locum')))).data().verificationStatus, 'pending');
+  await assertFails(submit());
+  assert.equal((await getDoc(revision(db('locum')))).data().state, 'draft');
 });

@@ -12,13 +12,12 @@ repository factory requires a `demo-` project, configures Auth, Firestore and
 Storage emulators, and rejects nonlocal hosts. The injectable client interface is
 for tests and future approved integration; it is not wired to production.
 
-With submission disabled, Locums retain the original profile-only save and
-navigation. Both account types require one valid document. The disabled client
-does not upload evidence or write a submission, and the UI says so explicitly.
+With submission disabled, neither form saves a pending profile or submits
+evidence. Both account types require one valid document.
 
 For an offline harness, initialize a *separate named app* with a
 `demo-optolocum-verification` FirebaseOptions project and demo storage bucket. Pass
-it to `FirebaseVerificationRepository.emulator`, then inject
+it and a trusted finalization callback to `FirebaseVerificationRepository.emulator`, then inject
 `VerificationSubmissionService(repository)` into an existing form. Do not point
 the current production profile service at emulators; the Locum form's profile
 service must also be injected/mocked, or independently configured on the same
@@ -55,13 +54,12 @@ written to Firestore. Practice Owner evidence uses the same private object path.
 ## Persistence and failure behavior
 
 The service reserves a server-confirmed draft, uploads and confirms object
-metadata for either account type, performs the existing Locum profile save, then
-finalizes in a Firestore transaction. Practice Owners keep profile fields separate
-and do not mutate their profile during evidence submission. Success is shown
-only after completion. Existing Locum `verified`/`approved` profile status is
-preserved during an edit; a new submission does not downgrade it. The legacy Locum `pending` value
-it is not evidence that Admin reviewed anything and may remain pending after a
-later finalization failure.
+metadata for either account type, calls the trusted finalizer, then performs
+the existing Locum profile callback. Practice Owners keep profile fields separate
+and currently do not save their profile through the client. The candidate trusted
+finalizer atomically writes a pending profile and the submitted revision. The
+existing Locum profile callback must be reconciled with that atomic write before
+production integration. Legacy profile `pending` values do not prove a revision exists.
 
 The same form attempt keeps its revision ID on retry. An existing identical
 draft/submitted revision is accepted without replacing it. Existing objects are
@@ -81,28 +79,24 @@ The app never deletes submissions or objects as part of retry handling. Practice
 ## Security boundaries
 
 - Firestore allows owner-scoped reads and draft creation, with strict key/type
-  allowlists. The only client update adds submittedAt and changes draft to
-  submitted. Submitted revisions and their payloads cannot be changed/deleted.
+  allowlists. Clients cannot update or delete revisions; finalization must use
+  a trusted backend.
 - The accountType field grants no privileges. Account-role provisioning is out
   of scope. No submitted data should be used to grant a role.
 - Admin-claim readers can inspect evidence. Neither applicant nor Admin Flutter
   clients can write account_management or review decisions. That future document
   must contain only a user-readable management summary; internal reviewer notes
   belong in a separate server-controlled, access-restricted document.
-- Storage allows owner creates only while the corresponding Locum draft exists.
+- Storage allows owner creates only while the corresponding draft exists.
   It checks the exact path, declared MIME/size/hash, positive size <= 50 MiB, and
   rejects overwrites, metadata updates, deletion, listing and other users. Owners
   and Admin-claim reviewers can read private objects via authenticated SDK reads.
 - The app checks PDF/PNG/JPEG signatures as well as extension and size. This is a
   basic format check, not a full parser, malware scanner or identity check.
 - Storage rules validate declared metadata, not actual byte signatures/hashes.
-  Firestore rules **cannot inspect Storage existence**. A malicious applicant
-  can finalize a revision without an object; it is only untrusted evidence.
-  Phase 2's trusted approval endpoint must retrieve the actual immutable object,
-  validate size/type/hash/content and bind the decision to that revision before
-  writing any trusted verification result. Missing or invalid evidence must
-  never become approved. A trusted submission-finalizer can be added if the
-  pending-review queue itself must exclude fabricated references.
+  Firestore rules cannot inspect Storage existence. The local finalizer candidate
+  delegates byte validation to the Admin backend; it is not yet an authenticated
+  callable or production-ready. Existing live rules still require review.
 - Practice approval means review of self-reported store details. No independent
   business/registry verification or document requirement is claimed.
 

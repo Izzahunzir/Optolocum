@@ -264,34 +264,28 @@ void main() {
       expect(find.text('Open form'), findsOneWidget);
     },
   );
-  testWidgets(
-    'disabled Locum integration preserves profile-only saving and labels it honestly',
-    (tester) async {
-      await _openLocum(
-        tester,
-        profiles,
-        const DisabledVerificationSubmissions(),
-        () async => file('evidence.pdf'),
-      );
-      await tester.ensureVisible(find.text('Choose one document'));
-      await tester.tap(find.text('Choose one document'));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Update'));
-      await tester.tap(find.text('Update'));
-      await tester.pumpAndSettle();
-      verify(() => profiles.save(any())).called(1);
-      expect(
-        find.text(
-          'Profile saved. Your document has not been uploaded or submitted for verification.',
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.text('Your details and document have been submitted for review.'),
-        findsNothing,
-      );
-    },
-  );
+  testWidgets('disabled Locum integration does not save a pending profile', (
+    tester,
+  ) async {
+    await _openLocum(
+      tester,
+      profiles,
+      const DisabledVerificationSubmissions(),
+      () async => file('evidence.pdf'),
+    );
+    await tester.ensureVisible(find.text('Choose one document'));
+    await tester.tap(find.text('Choose one document'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Update'));
+    await tester.tap(find.text('Update'));
+    await tester.pumpAndSettle();
+    verifyNever(() => profiles.save(any()));
+    expect(find.text(DisabledVerificationSubmissions.message), findsOneWidget);
+    expect(
+      find.text('Your details and document have been submitted for review.'),
+      findsNothing,
+    );
+  });
   testWidgets(
     'Practice Owner submits all existing fields and waits for commit',
     (tester) async {
