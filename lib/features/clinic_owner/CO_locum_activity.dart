@@ -905,47 +905,7 @@ Widget build(BuildContext context) {
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 28),
-              detail(
-                Icons.calendar_today_outlined,
-                'Job Date',
-                applicant.jobDate,
-              ),
-              detail(Icons.access_time, 'Time', applicant.time),
-              detail(
-                Icons.location_on_outlined,
-                'Location',
-                applicant.location,
-              ),
-              detail(
-                Icons.description_outlined,
-                'Position',
-                applicant.position,
-              ),
-              const SizedBox(height: 8),
-              if (applicant.status == COLocumActivityStatus.pending)
-                Row(
-                  children: [
-                    Expanded(
-                      child: action('Reject', Icons.close, Colors.red, null),
-                    ),
-                  ),
-
-                  if (!hasJobEnded)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 6),
-                      child: Text(
-                        'Available after the job end time.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
-                )
+              )
               else
                 action(
                   'Message',

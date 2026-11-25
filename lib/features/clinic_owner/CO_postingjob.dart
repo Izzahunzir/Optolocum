@@ -738,6 +738,7 @@ class _PostingFormState extends State<_PostingForm> {
       placeName: _values['Place Name']!,
       location: _values['Location']!,
       role: _values['Role']!,
+      vacancies: int.parse(_values['Number of Vacancies']!),
       date: _date!,
       start: _start!,
       end: _end!,
@@ -758,6 +759,7 @@ class _PostingFormState extends State<_PostingForm> {
         placeName: posting.placeName,
         location: posting.location,
         role: posting.role,
+        vacancies: posting.vacancies,
         jobDate: posting.date,
         startTime: formatTime(posting.start),
         endTime: formatTime(posting.end),
@@ -777,7 +779,9 @@ class _PostingFormState extends State<_PostingForm> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _saveError = 'Failed to post job. Please try again.';
+        _saveError = error is FirebaseException && error.code == 'permission-denied'
+            ? 'Only active, verified Practice Owner accounts can post jobs. Check your verification or contact support.'
+            : 'Failed to post job. Please try again.';
       });
     }
   }

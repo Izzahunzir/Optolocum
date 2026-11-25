@@ -63,6 +63,7 @@ void main() {
         placeName: any(named: 'placeName'),
         location: any(named: 'location'),
         role: any(named: 'role'),
+        vacancies: any(named: 'vacancies'),
         jobDate: any(named: 'jobDate'),
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
@@ -91,21 +92,17 @@ void main() {
       0: 'Vision Care Clinic',
       1: 'Central Mall',
       2: 'Optometrist',
-      6: '65',
-      7: 'Eye examinations',
-      8: 'Natalie',
-      9: '0123456789',
+      3: '2',
+      7: '65',
+      8: 'Eye examinations',
+      9: 'Natalie',
+      10: '0123456789',
     };
     for (final entry in values.entries) {
       await tester.ensureVisible(fields.at(entry.key));
       await tester.pumpAndSettle();
       await tester.enterText(fields.at(entry.key), entry.value);
     }
-    await tester.ensureVisible(fields.at(3));
-    await tester.tap(fields.at(3));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
     await tester.ensureVisible(fields.at(4));
     await tester.tap(fields.at(4));
     await tester.pumpAndSettle();
@@ -113,6 +110,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.ensureVisible(fields.at(5));
     await tester.tap(fields.at(5));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(fields.at(6));
+    await tester.tap(fields.at(6));
     await tester.pumpAndSettle();
     await tester.tap(find.text('PM'));
     await tester.tap(find.text('OK'));
@@ -126,6 +128,7 @@ void main() {
         placeName: 'Vision Care Clinic',
         location: 'Central Mall',
         role: 'Optometrist',
+        vacancies: 2,
         jobDate: any(named: 'jobDate'),
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),
@@ -164,6 +167,7 @@ void main() {
         placeName: any(named: 'placeName'),
         location: any(named: 'location'),
         role: any(named: 'role'),
+        vacancies: any(named: 'vacancies'),
         jobDate: any(named: 'jobDate'),
         startTime: any(named: 'startTime'),
         endTime: any(named: 'endTime'),

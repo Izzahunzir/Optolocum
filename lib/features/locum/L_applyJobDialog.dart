@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../services/application_service.dart';
 
@@ -101,6 +102,10 @@ Future<void> showApplyJobDialog({
     Navigator.of(context, rootNavigator: true).pop();
 
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Failed to apply: $e')));
+        .showSnackBar(SnackBar(content: Text(
+          e is FirebaseException && e.code == 'permission-denied'
+              ? 'Only active, verified Locum accounts can apply. Check your verification or contact support.'
+              : 'Failed to apply: $e',
+        )));
   }
 }

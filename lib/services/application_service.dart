@@ -4,6 +4,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+/// Public summary vocabulary uses `verified` for either approved status spelling.
+String applicantSummaryStatus(Object? status) => switch (status) {
+  'approved' || 'verified' => 'verified',
+  'pending' => 'pending',
+  _ => 'unverified',
+};
+
 /// Only the applicant fields that a clinic owner may display.
 class ApplicantSummary {
   const ApplicantSummary({
@@ -106,12 +113,7 @@ class ApplicationService {
         'course',
       ])
         key: profile[key] is String ? profile[key] as String : '',
-      'verificationStatus':
-          profile['verificationStatus'] == 'verified'
-              ? 'verified'
-              : profile['verificationStatus'] == 'pending'
-                  ? 'pending'
-                  : 'unverified',
+      'verificationStatus': applicantSummaryStatus(profile['verificationStatus']),
     };
   }
 

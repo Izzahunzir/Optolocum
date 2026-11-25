@@ -40,6 +40,7 @@ void main() {
         placeName: 'Vision Care Clinic',
         location: 'Central Mall',
         role: 'Optometrist',
+        vacancies: 2,
         jobDate: DateTime(2026, 12, 1),
         startTime: '09:00',
         endTime: '17:00',
@@ -56,6 +57,7 @@ void main() {
               as Map<String, dynamic>;
       expect(data['clinicOwnerId'], 'owner-1');
       expect(data['placeName'], 'Vision Care Clinic');
+      expect(data['vacancies'], 2);
       expect(data['jobDate'], Timestamp.fromDate(DateTime(2026, 12, 1)));
       expect(data['payRateUnit'], 'per_hour');
       expect(data['status'], 'available');
@@ -72,6 +74,7 @@ void main() {
         placeName: 'Clinic',
         location: 'City',
         role: 'Optometrist',
+        vacancies: 1,
         jobDate: DateTime(2026, 12, 1),
         startTime: '09:00',
         endTime: '17:00',

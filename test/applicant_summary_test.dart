@@ -2,6 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:optolocum/services/application_service.dart';
 
 void main() {
+  test('summary maps approved and legacy verified statuses consistently', () {
+    expect(applicantSummaryStatus('approved'), 'verified');
+    expect(applicantSummaryStatus('verified'), 'verified');
+    expect(applicantSummaryStatus('pending'), 'pending');
+    expect(applicantSummaryStatus('rejected'), 'unverified');
+  });
   test('applicant summary exposes only permitted profile fields', () {
     final summary = ApplicantSummary.fromFirestore({
       'fullName': '  Test Locum  ',

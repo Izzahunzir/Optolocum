@@ -1,6 +1,7 @@
 import 'package:optolocum/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../services/demo_enrollment.dart';
 
 import '../auth/CO_header.dart';
 
@@ -35,18 +36,25 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
     if (_isSubmitting || !_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
+    _formKey.currentState!.save();
     try {
-      await AuthService().signUp(
-        email: emailController.text,
-        password: passwordController.text,
-      );
+      if (demoEnrollmentEnabled) {
+        final service = DemoEnrollment.instance;
+        if (service == null) throw StateError('Demo enrollment is unavailable.');
+        await service.enroll(email: emailController.text, password: passwordController.text,
+          accountType: 'locum', profile: {'fullName': _fullName});
+      } else {
+        await AuthService().signUp(email: emailController.text, password: passwordController.text);
+      }
       if (!mounted) return;
-      _formKey.currentState!.save();
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => LVerifyPopup(displayName: _fullName),
         ),
       );
+    } on DemoEnrollmentException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } on FirebaseAuthException catch (e) {
       debugPrint('Signup failed: ${e.code}');
       if (!mounted) return;
