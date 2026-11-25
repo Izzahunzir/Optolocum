@@ -7,24 +7,59 @@ import 'firebase_options.dart';
 import 'features/intro/intro_page.dart';
 import 'services/verification_status_sync.dart';
 import 'services/demo_enrollment.dart';
+import 'services/real_backend_client.dart';
+import 'services/real_backend_workflows.dart';
+import 'services/backend_http_platform.dart';
+
 import 'package:flutter/foundation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  if (demoEnrollmentEnabled && realBackendEnabled) {
+    throw StateError(
+      'Real backend and isolated demo cannot be enabled together.',
+    );
+  }
+
   if (demoEnrollmentEnabled) {
     if (!kIsWeb || Uri.base.origin != 'http://localhost:5174') {
-      throw StateError('Isolated demo requires Chrome at http://localhost:5174.');
+      throw StateError(
+        'Isolated demo requires Chrome at http://localhost:5174.',
+      );
     }
-    final app = await Firebase.initializeApp(options: const FirebaseOptions(
-      apiKey: 'demo-api-key', appId: 'demo-app', messagingSenderId: '123456789',
-      projectId: demoProjectId,
-    ));
-    await FirebaseAuth.instanceFor(app: app).useAuthEmulator('127.0.0.1', 19099);
-    FirebaseFirestore.instanceFor(app: app).useFirestoreEmulator('127.0.0.1', 18080);
+    final app = await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: 'demo-api-key',
+        appId: 'demo-app',
+        messagingSenderId: '123456789',
+        projectId: demoProjectId,
+      ),
+    );
+    await FirebaseAuth.instanceFor(app: app)
+        .useAuthEmulator('127.0.0.1', 19099);
+    FirebaseFirestore.instanceFor(app: app)
+        .useFirestoreEmulator('127.0.0.1', 18080);
     DemoEnrollment.configure(app);
   } else {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    final app = await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    if (realBackendEnabled) {
+      // Persisted Firebase identity is not proof of current trusted access.
+      await FirebaseAuth.instanceFor(app: app).signOut();
+      const url = String.fromEnvironment('OPT_BACKEND_URL');
+      final config = RealBackendConfig(
+        baseUrl: url,
+        projectId: app.options.projectId,
+        emulatorEnabled: demoEnrollmentEnabled,
+      );
+      realBackendWorkflows = RealBackendWorkflows(
+        RealBackendClient(config, client: createBackendHttpClient()),
+        FirebaseAuth.instanceFor(app: app),
+        FirebaseFirestore.instanceFor(app: app),
+      );
+    }
   }
   VerificationStatusSync(
     FirebaseAuth.instance,

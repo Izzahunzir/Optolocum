@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../services/real_backend_workflows.dart';
 
 import 'CO_verification_status.dart';
 import 'CO_verification_form.dart';
@@ -71,16 +75,21 @@ class COAccountVerification extends StatelessWidget {
                       color: Color(0xFF666666),
                     ),
                   ),
+                  if (status == COVerificationStatus.approved &&
+                      realBackendEnabled)
+                    const _ApprovedPracticeDetails(),
                   const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                        builder: (_) => const COVerificationForm(),
+                  if (status == COVerificationStatus.unverified ||
+                      status == COVerificationStatus.rejected)
+                    ElevatedButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const COVerificationForm(),
+                        ),
                       ),
+                      child: const Text('Complete Your Profile'),
                     ),
-                    child: const Text('Complete Your Profile'),
-                  ),
                 ],
               ),
             ),
@@ -89,4 +98,55 @@ class COAccountVerification extends StatelessWidget {
       },
     ),
   );
+}
+
+class _ApprovedPracticeDetails extends StatelessWidget {
+  const _ApprovedPracticeDetails();
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const Text('Sign in to view your details.');
+    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      future: FirebaseFirestore.instance
+          .collection('practice_owner_profiles')
+          .doc(uid)
+          .get(const GetOptions(source: Source.server)),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: CircularProgressIndicator(),
+          );
+        }
+        final data = snapshot.data?.data();
+        if (snapshot.hasError ||
+            data == null ||
+            FirebaseAuth.instance.currentUser?.uid != uid) {
+          return const Text('Unable to load verification details.');
+        }
+        const labels = {
+          'practiceType': 'Type of Practice',
+          'clinicName': 'Clinic Name',
+          'registrationNumber': 'Registration Number',
+          'address': 'Address',
+          'state': 'State',
+          'contactNumber': 'Contact Number',
+          'companyEmail': 'Company Email',
+        };
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final entry in labels.entries)
+              if (data[entry.key] is String &&
+                  (data[entry.key] as String).isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text('${entry.value}: ${data[entry.key]}'),
+                ),
+          ],
+        );
+      },
+    );
+  }
 }

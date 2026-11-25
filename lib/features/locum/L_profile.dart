@@ -75,6 +75,56 @@ class _LProfileState extends State<LProfile> {
   static const _teal = Color(0xFF237F7D);
   static const _card = Color(0xFFEBF6F4);
 
+  void _showVerification() {
+    final profile = locumProfileData.value;
+    if (_loading || _error != null || profile?.uid != _service.currentUid) {
+      return;
+    }
+    final status = profile?.verificationStatus ?? 'unverified';
+    if (status != 'approved' && status != 'pending') {
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute<void>(
+              builder: (_) => LVerificationForm(
+                profileService: widget.profileService,
+                pickDocument: widget.pickDocument,
+              ),
+            ),
+          )
+          .then((_) {
+            if (mounted) _load();
+          });
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Account Verification'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(status == 'approved' ? 'Approved' : 'Awaiting review'),
+              if (status == 'approved' && profile != null)
+                for (final field in profile.fields.entries)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text('${field.key}: ${field.value}'),
+                  ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _option(String label, IconData icon, {VoidCallback? onTap}) => Padding(
     padding: const EdgeInsets.only(bottom: 18),
     child: Material(
@@ -164,19 +214,7 @@ class _LProfileState extends State<LProfile> {
             _option(
               'Account Verification',
               Icons.how_to_reg,
-              onTap: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    // Reuse the onboarding form, but prefill it and show Update.
-                    builder: (_) => LVerificationForm(
-                      isEditing: true,
-                      profileService: widget.profileService,
-                      pickDocument: widget.pickDocument,
-                    ),
-                  ),
-                );
-                if (mounted) await _load();
-              },
+              onTap: _showVerification,
             ),
             _option(
               'Job Process Guide',

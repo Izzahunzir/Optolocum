@@ -2,6 +2,10 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+import 'real_backend_workflows.dart';
+import 'real_account_permission.dart';
+
 import 'package:flutter/foundation.dart';
 
 /// Public summary vocabulary uses `verified` for either approved status spelling.
@@ -107,13 +111,11 @@ class ApplicationService {
     // Preserve saved values exactly so the rules can compare them with the
     // private profile. Never copy the complete profile or local file paths.
     return {
-      for (final key in [
-        'fullName',
-        'highestEducation',
-        'course',
-      ])
+      for (final key in ['fullName', 'highestEducation', 'course'])
         key: profile[key] is String ? profile[key] as String : '',
-      'verificationStatus': applicantSummaryStatus(profile['verificationStatus']),
+      'verificationStatus': applicantSummaryStatus(
+        profile['verificationStatus'],
+      ),
     };
   }
 
@@ -171,6 +173,9 @@ class ApplicationService {
     if (user == null) {
       throw Exception('Please log in before applying.');
     }
+
+    if (realBackendEnabled)
+      await requireApprovedAccount(_auth, _firestore, 'locum');
 
     final applicationRef = _firestore
         .collection('applications')

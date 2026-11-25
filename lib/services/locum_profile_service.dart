@@ -53,7 +53,7 @@ class LocumProfileService {
     locumProfileData.value = profile;
     locumVerificationStatus.value = switch (profile?.verificationStatus) {
       'pending' => LocumVerificationStatus.pending,
-      'approved' || 'verified' => LocumVerificationStatus.approved,
+      'approved' => LocumVerificationStatus.approved,
       'rejected' => LocumVerificationStatus.rejected,
       _ => LocumVerificationStatus.unverified,
     };
@@ -117,8 +117,7 @@ class LocumProfileService {
         uid: profile.uid,
         fields: profile.fields,
         documents: profile.documents,
-        verificationStatus:
-            priorStatus == 'approved' || priorStatus == 'verified'
+        verificationStatus: priorStatus == 'approved'
             ? priorStatus!
             : profile.verificationStatus,
       ),

@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'real_backend_workflows.dart';
+import 'real_account_permission.dart';
+
 class JobService {
   JobService({FirebaseFirestore? firestore, FirebaseAuth? auth})
     : _firestore = firestore ?? FirebaseFirestore.instance,
@@ -28,6 +31,9 @@ class JobService {
     if (user == null) {
       throw Exception('Please log in before posting a job.');
     }
+
+    if (realBackendEnabled)
+      await requireApprovedAccount(_auth, _firestore, 'practice_owner');
 
     final document = await _firestore.collection('job_postings').add({
       'clinicOwnerId': user.uid,

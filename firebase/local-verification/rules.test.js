@@ -62,7 +62,9 @@ test('server-created profiles: own reads and edits, no forged status or privileg
   await assertFails(setDoc(ref(db('new'), 'locum_profiles/new'), { verificationStatus: 'unverified' }));
   await assertFails(setDoc(ref(db('new'), 'practice_owner_profiles/new'), { verificationStatus: 'unverified' }));
   await env.withSecurityRulesDisabled(async c => updateDoc(ref(c.firestore(), 'locum_profiles/locum'), { verificationStatus: 'approved' }));
-  await assertSucceeds(updateDoc(ref(db('locum'), 'locum_profiles/locum'), { phoneNumber: '0199999999', verificationStatus: 'approved' }));
+  await assertFails(updateDoc(ref(db('locum'), 'locum_profiles/locum'), { phoneNumber: '0199999999', verificationStatus: 'approved' }));
+  await env.withSecurityRulesDisabled(async c => updateDoc(ref(c.firestore(), 'practice_owner_profiles/owner'), { verificationStatus: 'approved' }));
+  await assertFails(updateDoc(ref(db('owner'), 'practice_owner_profiles/owner'), { fullName: 'Changed' }));
   for (const field of ['fullName', 'nric', 'dateOfBirth', 'highestEducation', 'course'])
     await assertFails(updateDoc(ref(db('locum'), 'locum_profiles/locum'), { [field]: 'Changed' }));
   for (const field of ['clinicName', 'registrationNumber', 'practiceType', 'address'])

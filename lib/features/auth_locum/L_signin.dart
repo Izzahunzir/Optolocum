@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:optolocum/services/auth_service.dart';
 
+import '../../services/real_backend_workflows.dart';
+
 import '../auth/CO_header.dart';
 
 import 'L_forgotpass.dart';
@@ -35,13 +37,29 @@ class _LocumSigninPageState extends State<LocumSigninPage> {
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
     try {
-      await AuthService().signIn(
-        email: emailController.text,
-        password: passwordController.text,
-      );
+      if (realBackendEnabled) {
+        final service = realBackendWorkflows;
+        if (service == null) {
+          throw StateError('Account access validation is unavailable.');
+        }
+        await service.signIn(
+          email: emailController.text,
+          password: passwordController.text,
+          accountType: 'locum',
+        );
+      } else {
+        await AuthService().signIn(
+          email: emailController.text,
+          password: passwordController.text,
+        );
+      }
       if (!mounted) return;
       Navigator.of(context)
           .push(MaterialPageRoute<void>(builder: (_) => const LVerifyPopup()));
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } on FirebaseAuthException catch (e) {
       debugPrint('Login failed: ${e.code}');
       if (!mounted) return;

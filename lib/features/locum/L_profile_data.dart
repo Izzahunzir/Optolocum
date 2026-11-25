@@ -46,7 +46,7 @@ class LocumProfileData {
             : '',
     },
     verificationStatus: switch (data['verificationStatus']) {
-      'verified' || 'approved' => 'approved',
+      'approved' => 'approved',
       'pending' => 'pending',
       'rejected' => 'rejected',
       _ => 'unverified',

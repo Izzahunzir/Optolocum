@@ -84,11 +84,6 @@ Future<void> _fillPractice(
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpAndSettle();
-  if (selectDocument) {
-    await tester.ensureVisible(find.text('Choose one document'));
-    await tester.tap(find.text('Choose one document'));
-    await tester.pumpAndSettle();
-  }
   for (final entry in [
     ('practice-type', 'Retail Optical Store'),
     ('malaysian-state', 'Johor'),
@@ -112,9 +107,17 @@ Future<void> _fillPractice(
     await tester.ensureVisible(fields.at(i));
     await tester.enterText(fields.at(i), values[i]);
   }
-  await tester.ensureVisible(find.text('Verify Account'));
   FocusManager.instance.primaryFocus?.unfocus();
   await tester.pumpAndSettle();
+  await tester.ensureVisible(find.text('Next'));
+  await tester.tap(find.text('Next'));
+  await tester.pumpAndSettle();
+  if (selectDocument) {
+    await tester.ensureVisible(find.text('Choose one document'));
+    await tester.tap(find.text('Choose one document'));
+    await tester.pumpAndSettle();
+  }
+  await tester.ensureVisible(find.text('Verify Account'));
 }
 
 void main() {

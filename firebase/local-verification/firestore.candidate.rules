@@ -76,6 +76,7 @@ service cloud.firestore {
       allow list: if false;
       allow create: if false;
       allow update: if activeSession() && request.auth.uid == locumId
+        && resource.data.get('verificationStatus', '') != 'approved'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'email', 'phoneNumber', 'gender', 'updatedAt'
         ]);
@@ -162,6 +163,7 @@ service cloud.firestore {
       allow create: if false;
       allow get, list: if isAdmin();
       allow update: if activeSession() && request.auth.uid == ownerId
+        && resource.data.get('verificationStatus', '') != 'approved'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName', 'phoneNumber', 'role', 'updatedAt'])
         && request.resource.data.fullName is string && request.resource.data.fullName.size() > 0
         && request.resource.data.phoneNumber is string

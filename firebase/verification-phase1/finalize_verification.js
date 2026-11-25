@@ -58,6 +58,7 @@ async function finalizeVerification({ db, bucket, uid, submissionId, verifyStora
     const checked = validateDraft(current.data(), uid, submissionId);
     if (checked.fingerprint !== draft.fingerprint || ['path', 'name', 'contentType', 'size', 'sha256'].some(key => checked.document[key] !== draft.document[key]) || checked.createdAt.toMillis() !== draft.createdAt.toMillis()) reject('Revision changed during validation.');
     if (otherProfile.exists || (draft.accountType === 'practice_owner' && !existingProfile.exists)) reject('Account type cannot be confirmed.');
+    if (existingProfile.data()?.verificationStatus === 'approved') reject('Approved verification details are read-only.');
     const newest = previous.docs[0];
     if (newest && newest.data().submittedAt.toMillis() >= checked.createdAt.toMillis()) reject('A newer submission exists. Start a new revision.');
     const fields = draft.accountType === 'locum' ? checked.submittedFields : {};
