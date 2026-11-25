@@ -1,7 +1,10 @@
 import 'package:optolocum/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 import '../../services/demo_enrollment.dart';
+import '../../services/real_backend_workflows.dart';
+import '../../services/real_backend_client.dart';
 
 import '../auth/CO_header.dart';
 
@@ -38,13 +41,31 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
     setState(() => _isSubmitting = true);
     _formKey.currentState!.save();
     try {
-      if (demoEnrollmentEnabled) {
+      if (realBackendEnabled) {
+        final service = realBackendWorkflows;
+        if (service == null) throw StateError('Backend is unavailable.');
+        await service.enroll(
+          email: emailController.text,
+          password: passwordController.text,
+          accountType: 'locum',
+          profile: {'fullName': _fullName},
+        );
+      } else if (demoEnrollmentEnabled) {
         final service = DemoEnrollment.instance;
-        if (service == null) throw StateError('Demo enrollment is unavailable.');
-        await service.enroll(email: emailController.text, password: passwordController.text,
-          accountType: 'locum', profile: {'fullName': _fullName});
+        if (service == null) {
+          throw StateError('Demo enrollment is unavailable.');
+        }
+        await service.enroll(
+          email: emailController.text,
+          password: passwordController.text,
+          accountType: 'locum',
+          profile: {'fullName': _fullName},
+        );
       } else {
-        await AuthService().signUp(email: emailController.text, password: passwordController.text);
+        await AuthService().signUp(
+          email: emailController.text,
+          password: passwordController.text,
+        );
       }
       if (!mounted) return;
       Navigator.of(context).push(
@@ -52,9 +73,18 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
           builder: (_) => LVerifyPopup(displayName: _fullName),
         ),
       );
+    } on BackendException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } on DemoEnrollmentException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } on FirebaseAuthException catch (e) {
       debugPrint('Signup failed: ${e.code}');
       if (!mounted) return;

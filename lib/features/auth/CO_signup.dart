@@ -2,7 +2,10 @@ import 'package:optolocum/services/auth_service.dart';
 import 'package:optolocum/services/practice_owner_profile_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 import '../../services/demo_enrollment.dart';
+import '../../services/real_backend_workflows.dart';
+import '../../services/real_backend_client.dart';
 
 import 'CO_header.dart';
 
@@ -45,17 +48,42 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
     final phoneNumber = phoneNumberController.text.trim();
     final role = _selectedRole!;
     try {
-      if (demoEnrollmentEnabled) {
-        final service = DemoEnrollment.instance;
-        if (service == null) throw StateError('Demo enrollment is unavailable.');
-        await service.enroll(email: email, password: passwordController.text,
-          accountType: 'practice_owner', profile: {
-            'fullName': fullName, 'phoneNumber': phoneNumber, 'role': role,
-          });
+      if (realBackendEnabled || demoEnrollmentEnabled) {
+        if (realBackendEnabled) {
+          final service = realBackendWorkflows;
+          if (service == null) throw StateError('Backend is unavailable.');
+          await service.enroll(
+            email: email,
+            password: passwordController.text,
+            accountType: 'practice_owner',
+            profile: {
+              'fullName': fullName,
+              'phoneNumber': phoneNumber,
+              'role': role,
+            },
+          );
+        } else {
+          final service = DemoEnrollment.instance;
+          if (service == null) {
+            throw StateError('Demo enrollment is unavailable.');
+          }
+          await service.enroll(
+            email: email,
+            password: passwordController.text,
+            accountType: 'practice_owner',
+            profile: {
+              'fullName': fullName,
+              'phoneNumber': phoneNumber,
+              'role': role,
+            },
+          );
+        }
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Account created successfully. You can now log in.'),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created successfully. You can now log in.'),
+          ),
+        );
         return;
       }
       if (_pendingUid == null) {
@@ -94,9 +122,18 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
           content: Text('Account created successfully. You can now log in.'),
         ),
       );
+    } on BackendException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } on DemoEnrollmentException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } on FirebaseAuthException catch (e) {
       debugPrint('Signup failed: ${e.code}');
       if (!mounted) return;

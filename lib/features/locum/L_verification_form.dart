@@ -5,6 +5,8 @@ import 'dart:async';
 
 import '../../services/locum_profile_service.dart';
 import '../../services/verification_submission.dart';
+import '../../services/real_backend_workflows.dart';
+import '../../services/real_backend_client.dart';
 
 import 'L_mainpage.dart';
 import 'L_profile_data.dart';
@@ -14,7 +16,7 @@ class LVerificationForm extends StatefulWidget {
     super.key,
     this.displayName = '',
     this.isEditing = false,
-    this.submissions = const DisabledVerificationSubmissions(),
+    this.submissions,
     this.profileService,
     this.pickDocument,
   });
@@ -22,7 +24,7 @@ class LVerificationForm extends StatefulWidget {
 
   // false: first-time verification; true: update from the Account tab.
   final bool isEditing;
-  final VerificationSubmissionClient submissions;
+  final VerificationSubmissionClient? submissions;
   final LocumProfileService? profileService;
   final Future<XFile?> Function()? pickDocument;
 
@@ -31,6 +33,10 @@ class LVerificationForm extends StatefulWidget {
 }
 
 class _LVerificationFormState extends State<LVerificationForm> {
+  VerificationSubmissionClient get _submissions =>
+      widget.submissions ??
+      realBackendWorkflows ??
+      const DisabledVerificationSubmissions();
   final _formKey = GlobalKey<FormState>();
   final _documents = <XFile>[];
   bool _uploadStep = false;
@@ -189,7 +195,7 @@ class _LVerificationFormState extends State<LVerificationForm> {
         document: await VerificationDocument.fromFile(_documents.single),
       );
       if (_attempt?.fingerprint != candidate.fingerprint) _attempt = candidate;
-      await widget.submissions.submit(
+      await _submissions.submit(
         _attempt!,
         saveProfile: () => _service.save(profile),
       );
@@ -215,7 +221,9 @@ class _LVerificationFormState extends State<LVerificationForm> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            error is StateError
+            error is BackendException
+                ? error.message
+                : error is StateError
                 ? error.message.toString()
                 : error is FormatException
                 ? error.message
@@ -400,7 +408,7 @@ class _LVerificationFormState extends State<LVerificationForm> {
                       ),
                       if (_uploadStep) ...[
                         Text(
-                          widget.submissions is DisabledVerificationSubmissions
+                          _submissions is DisabledVerificationSubmissions
                               ? 'Choose one combined MOC Registration Certificate and current APC document. Submission is currently unavailable until verification is enabled.'
                               : 'Choose one combined MOC Registration Certificate and current APC document for private review.',
                           style: const TextStyle(

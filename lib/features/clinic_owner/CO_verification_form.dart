@@ -3,16 +3,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_selector/file_selector.dart';
 
 import '../../services/verification_submission.dart';
-import 'CO_verification_status.dart';
+import '../../services/real_backend_workflows.dart';
+import '../../services/real_backend_client.dart';
 
 class COVerificationForm extends StatefulWidget {
   const COVerificationForm({
     super.key,
-    this.submissions = const DisabledVerificationSubmissions(),
+    this.submissions,
     this.currentUid,
     this.pickDocument,
   });
-  final VerificationSubmissionClient submissions;
+  final VerificationSubmissionClient? submissions;
   final String? Function()? currentUid;
   final Future<XFile?> Function()? pickDocument;
 
@@ -46,10 +47,15 @@ class COVerificationForm extends StatefulWidget {
 }
 
 class _COVerificationFormState extends State<COVerificationForm> {
+  VerificationSubmissionClient get _submissions =>
+      widget.submissions ??
+      realBackendWorkflows ??
+      const DisabledVerificationSubmissions();
   static const _blue = Color(0xFF3B4E89);
   final _formKey = GlobalKey<FormState>();
   final _values = <String, String>{};
   bool _saving = false;
+  bool _submitted = false;
   int _step = 0;
   VerificationSubmission? _attempt;
   String? _initialUid;
@@ -63,7 +69,7 @@ class _COVerificationFormState extends State<COVerificationForm> {
   @override
   void initState() {
     super.initState();
-    if (widget.submissions is! DisabledVerificationSubmissions) {
+    if (_submissions is! DisabledVerificationSubmissions) {
       _initialUid = _currentUid();
     }
   }
@@ -211,7 +217,7 @@ class _COVerificationFormState extends State<COVerificationForm> {
   );
 
   Future<void> _submit() async {
-    if (_saving) return;
+    if (_saving || _submitted) return;
     if (_step == 0) {
       if (!_formKey.currentState!.validate()) return;
       _formKey.currentState!.save();
@@ -230,7 +236,7 @@ class _COVerificationFormState extends State<COVerificationForm> {
     setState(() => _saving = true);
     try {
       // Do not even initialize Firebase when the production gate is closed.
-      if (widget.submissions is DisabledVerificationSubmissions) {
+      if (_submissions is DisabledVerificationSubmissions) {
         throw StateError(DisabledVerificationSubmissions.message);
       }
       final uid = _currentUid();
@@ -245,12 +251,12 @@ class _COVerificationFormState extends State<COVerificationForm> {
         document: await VerificationDocument.fromFile(_document!),
       );
       if (_attempt?.fingerprint != candidate.fingerprint) _attempt = candidate;
-      await widget.submissions.submit(_attempt!);
+      await _submissions.submit(_attempt!);
       if (!mounted) return;
       if (_currentUid() != uid) {
         throw StateError('Your account changed. Please reopen the form.');
       }
-      coVerificationStatus.value = COVerificationStatus.pending;
+      setState(() => _submitted = true);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -267,7 +273,9 @@ class _COVerificationFormState extends State<COVerificationForm> {
         ..showSnackBar(
           SnackBar(
             content: Text(
-              error is StateError
+              error is BackendException
+                  ? error.message
+                  : error is StateError
                   ? error.message.toString()
                   : error is FormatException
                   ? error.message
@@ -342,130 +350,130 @@ class _COVerificationFormState extends State<COVerificationForm> {
                           ),
                           const SizedBox(height: 22),
                           if (_step == 0) ...[
-                          _dropdown(
-                            'Type of Practice',
-                            COVerificationForm.practiceTypes,
-                            'practice-type',
-                          ),
-                          _field(
-                            'Clinic Name',
-                            'Optometrist',
-                            autofillHints: const [
-                              AutofillHints.organizationName,
-                            ],
-                          ),
-                          _field(
-                            'Clinic Registration Number (SSM / Business Registration)',
-                            'e.g., 202401012345 or KKM/CKAPS/12345',
-                          ),
-                          _field(
-                            'Clinic Address',
-                            'e.g. Lot G-22, Ground Floor, Suria KLCC, 50088 Kuala Lumpur',
-                            keyboardType: TextInputType.multiline,
-                            maxLines: 3,
-                            autofillHints: const [
-                              AutofillHints.fullStreetAddress,
-                            ],
-                          ),
-                          _dropdown(
-                            'State',
-                            COVerificationForm.states,
-                            'malaysian-state',
-                          ),
-                          _field(
-                            'Clinic Contact Number',
-                            'e.g., 0123456789 or 0312345678',
-                            keyboardType: TextInputType.phone,
-                            autofillHints: const [
-                              AutofillHints.telephoneNumber,
-                            ],
-                            validator: (value) =>
-                                RegExp(r'^\+?[0-9]{7,15}$').hasMatch(
-                                  (value ?? '').replaceAll(
-                                    RegExp(r'[\s()-]'),
-                                    '',
-                                  ),
-                                )
-                                ? null
-                                : 'Enter a valid contact number',
-                          ),
-                          _field(
-                            'Email (Company)',
-                            'e.g., clinicname@gmail.com',
-                            keyboardType: TextInputType.emailAddress,
-                            autofillHints: const [AutofillHints.email],
-                            validator: (value) =>
-                                RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
-                                    .hasMatch((value ?? '').trim())
-                                ? null
-                                : 'Enter a valid company email',
-                          ),
-                          ] else ...[
-                          const SizedBox(height: 4),
-                          OutlinedButton(
-                            onPressed: _saving ? null : _pickDocument,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.all(30),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                            _dropdown(
+                              'Type of Practice',
+                              COVerificationForm.practiceTypes,
+                              'practice-type',
                             ),
-                            child: Column(
-                              children: [
-                                const Icon(
-                                  Icons.cloud_upload,
-                                  size: 54,
-                                  color: Color(0xFF9B9EAF),
-                                ),
-                                Text(
-                                  _document == null
-                                      ? 'Choose one document'
-                                      : 'Choose a different document',
-                                ),
-                                const Text(
-                                  'PNG, JPG, JPEG or PDF up to 50 MB',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey,
-                                  ),
-                                ),
+                            _field(
+                              'Clinic Name',
+                              'Optometrist',
+                              autofillHints: const [
+                                AutofillHints.organizationName,
                               ],
                             ),
-                          ),
-                          if (_document case final document?)
-                            Card(
-                              color: const Color(0xFFEEF2F1),
-                              child: ListTile(
-                                leading: Icon(
-                                  document.name.toLowerCase().endsWith('.pdf')
-                                      ? Icons.picture_as_pdf
-                                      : Icons.image,
-                                  color: Colors.red,
-                                ),
-                                title: Text(
-                                  document.name,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                                trailing: IconButton(
-                                  tooltip: 'Remove document',
-                                  icon: const Icon(Icons.close),
-                                  onPressed: _saving
-                                      ? null
-                                      : () => setState(() {
-                                          _document = null;
-                                          _documentError = null;
-                                        }),
+                            _field(
+                              'Clinic Registration Number (SSM / Business Registration)',
+                              'e.g., 202401012345 or KKM/CKAPS/12345',
+                            ),
+                            _field(
+                              'Clinic Address',
+                              'e.g. Lot G-22, Ground Floor, Suria KLCC, 50088 Kuala Lumpur',
+                              keyboardType: TextInputType.multiline,
+                              maxLines: 3,
+                              autofillHints: const [
+                                AutofillHints.fullStreetAddress,
+                              ],
+                            ),
+                            _dropdown(
+                              'State',
+                              COVerificationForm.states,
+                              'malaysian-state',
+                            ),
+                            _field(
+                              'Clinic Contact Number',
+                              'e.g., 0123456789 or 0312345678',
+                              keyboardType: TextInputType.phone,
+                              autofillHints: const [
+                                AutofillHints.telephoneNumber,
+                              ],
+                              validator: (value) =>
+                                  RegExp(r'^\+?[0-9]{7,15}$').hasMatch(
+                                    (value ?? '').replaceAll(
+                                      RegExp(r'[\s()-]'),
+                                      '',
+                                    ),
+                                  )
+                                  ? null
+                                  : 'Enter a valid contact number',
+                            ),
+                            _field(
+                              'Email (Company)',
+                              'e.g., clinicname@gmail.com',
+                              keyboardType: TextInputType.emailAddress,
+                              autofillHints: const [AutofillHints.email],
+                              validator: (value) =>
+                                  RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                                      .hasMatch((value ?? '').trim())
+                                  ? null
+                                  : 'Enter a valid company email',
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 4),
+                            OutlinedButton(
+                              onPressed: _saving ? null : _pickDocument,
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.all(30),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
-                            ),
-                          if (_documentError != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: Text(
-                                _documentError!,
-                                style: const TextStyle(color: Colors.red),
+                              child: Column(
+                                children: [
+                                  const Icon(
+                                    Icons.cloud_upload,
+                                    size: 54,
+                                    color: Color(0xFF9B9EAF),
+                                  ),
+                                  Text(
+                                    _document == null
+                                        ? 'Choose one document'
+                                        : 'Choose a different document',
+                                  ),
+                                  const Text(
+                                    'PNG, JPG, JPEG or PDF up to 50 MB',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+                            if (_document case final document?)
+                              Card(
+                                color: const Color(0xFFEEF2F1),
+                                child: ListTile(
+                                  leading: Icon(
+                                    document.name.toLowerCase().endsWith('.pdf')
+                                        ? Icons.picture_as_pdf
+                                        : Icons.image,
+                                    color: Colors.red,
+                                  ),
+                                  title: Text(
+                                    document.name,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                  trailing: IconButton(
+                                    tooltip: 'Remove document',
+                                    icon: const Icon(Icons.close),
+                                    onPressed: _saving
+                                        ? null
+                                        : () => setState(() {
+                                            _document = null;
+                                            _documentError = null;
+                                          }),
+                                  ),
+                                ),
+                              ),
+                            if (_documentError != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(
+                                  _documentError!,
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              ),
                           ],
                         ],
                       ),
@@ -473,7 +481,9 @@ class _COVerificationFormState extends State<COVerificationForm> {
                     const SizedBox(height: 28),
                     if (_step == 1) ...[
                       OutlinedButton(
-                        onPressed: _saving ? null : () => setState(() => _step = 0),
+                        onPressed: _saving
+                            ? null
+                            : () => setState(() => _step = 0),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size.fromHeight(48),
                           foregroundColor: _blue,

@@ -13,6 +13,9 @@ class LocumProfileStore {
     await firestore.runTransaction<void>((transaction) async {
       final snapshot = await transaction.get(reference);
       final existingStatus = snapshot.data()?['verificationStatus'];
+      if (existingStatus == 'approved') {
+        throw StateError('Approved verification details are read-only.');
+      }
       final preserveApproval =
           existingStatus == 'verified' || existingStatus == 'approved';
       final fields = profile.toFirestore();

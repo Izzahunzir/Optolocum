@@ -116,6 +116,16 @@ void main() {
     },
   );
 
+  test('approved profile rejects changes without writing', () async {
+    when(() => snapshot.exists).thenReturn(true);
+    when(() => snapshot.data()).thenReturn({'verificationStatus': 'approved'});
+    await expectLater(
+      LocumProfileStore(firestore).save(profile),
+      throwsStateError,
+    );
+    expect(writes, isEmpty);
+  });
+
   test(
     'editing an approved legacy profile does not overwrite approval status',
     () async {

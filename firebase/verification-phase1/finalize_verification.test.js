@@ -32,6 +32,26 @@ test('missing or invalid Storage object never starts a Firestore transaction', a
   await assert.rejects(finalizeVerification({ db, uid, submissionId: id, verifyStorageDocument: async () => { throw Error('missing object'); } }), /missing object/);
   assert.equal(transactionStarted, false);
 });
+test('finalizer rejects an approved profile inside its transaction', async () => {
+  const revision = { get: async () => ({ exists: true, data: draft }) };
+  const profile = {}, other = {};
+  const query = { orderBy() { return this; }, limit() { return this; } };
+  const revisions = { doc: () => revision, where: () => query };
+  const db = {
+    collection: name => ({ doc: () => name === 'verification_submissions'
+      ? { collection: () => revisions }
+      : name === 'locum_profiles' ? profile : other }),
+    runTransaction: async action => action({
+      get: async ref => ref === revision ? { exists: true, data: draft }
+        : ref === profile ? { exists: true, data: () => ({ verificationStatus: 'approved' }) }
+        : ref === other ? { exists: false } : { docs: [] },
+      set: () => { throw Error('unexpected write'); },
+      update: () => { throw Error('unexpected write'); },
+    }),
+  };
+  await assert.rejects(finalizeVerification({ db, uid, submissionId: id,
+    verifyStorageDocument: async () => {}, FieldPath: { documentId: () => 'id' } }), /read-only/);
+});
 test('callable adapter rejects unauthenticated, forged and disabled requests before persistence', async () => {
   const request = { data: { submissionId: id }, auth: { uid }, rawRequest: { headers: { authorization: 'Bearer test-token' }, rawHeaders: ['Authorization', 'Bearer test-token'] } };
   const auth = { verifyIdToken: async () => ({ uid }), getUser: async () => ({ disabled: true }) };

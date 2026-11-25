@@ -2,6 +2,8 @@ import 'package:optolocum/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../services/real_backend_workflows.dart';
+
 import 'CO_header.dart';
 import 'CO_signup.dart';
 import '../clinic_owner/CO_verify_popup.dart';
@@ -38,16 +40,32 @@ class _CompanyOwnerSigninPageState extends State<CompanyOwnerSigninPage> {
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
     try {
-      await (widget.authService ?? AuthService()).signIn(
-        email: emailController.text,
-        password: passwordController.text,
-      );
+      if (realBackendEnabled) {
+        final service = realBackendWorkflows;
+        if (service == null) {
+          throw StateError('Account access validation is unavailable.');
+        }
+        await service.signIn(
+          email: emailController.text,
+          password: passwordController.text,
+          accountType: 'practice_owner',
+        );
+      } else {
+        await (widget.authService ?? AuthService()).signIn(
+          email: emailController.text,
+          password: passwordController.text,
+        );
+      }
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => COVerifyPopup(jobsStream: widget.jobsStream),
         ),
       );
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } on FirebaseAuthException catch (e) {
       debugPrint('Login failed: ${e.code}');
       if (!mounted) return;

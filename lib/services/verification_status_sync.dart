@@ -38,7 +38,7 @@ class VerificationStatusSync {
             locumVerificationStatus.value = switch (snapshot
                 .data()?['verificationStatus']) {
               'pending' => LocumVerificationStatus.pending,
-              'approved' || 'verified' => LocumVerificationStatus.approved,
+              'approved' => LocumVerificationStatus.approved,
               'rejected' => LocumVerificationStatus.rejected,
               _ => LocumVerificationStatus.unverified,
             };
@@ -60,7 +60,7 @@ class VerificationStatusSync {
             coVerificationStatus.value = switch (snapshot
                 .data()?['verificationStatus']) {
               'pending' => COVerificationStatus.pending,
-              'approved' || 'verified' => COVerificationStatus.approved,
+              'approved' => COVerificationStatus.approved,
               'rejected' => COVerificationStatus.rejected,
               _ => COVerificationStatus.unverified,
             };

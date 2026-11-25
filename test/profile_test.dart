@@ -38,9 +38,16 @@ void main() {
       coVerificationStatus.value = COVerificationStatus.pending;
       await tester.pumpAndSettle();
       expect(find.text('Pending Verification'), findsOneWidget);
+      expect(find.text('Complete Your Profile'), findsNothing);
       coVerificationStatus.value = COVerificationStatus.approved;
       await tester.pumpAndSettle();
       expect(find.text('Verified'), findsOneWidget);
+      expect(find.text('Complete Your Profile'), findsNothing);
+      coVerificationStatus.value = COVerificationStatus.rejected;
+      await tester.pumpAndSettle();
+      expect(find.text('Complete Your Profile'), findsOneWidget);
+      coVerificationStatus.value = COVerificationStatus.approved;
+      await tester.pumpAndSettle();
       await tester.pageBack();
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Contact Us'));
