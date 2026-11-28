@@ -28,11 +28,9 @@ candidate does not authorize legacy direct client profile writes. The mobile
 summary maps canonical `approved` to the existing `verified` display value.
 Review legacy accounts and app behavior before activation.
 
-Real-backend startup uses a UID-bound account-type hint to choose the validation
-request and destination. The hint is not authorization: startup waits for the
-Firebase session and trusted HTTPS validation before showing an account home.
-Missing hints or validation failures return to sign-in; logout and account
-switching clear the previous account's hint.
+Real-backend startup signs out any persisted Firebase session and shows sign-in.
+Login still requires trusted HTTPS validation; logout and account switching
+clear the previous account's routing hint.
 
 `firebase.json` explicitly supplies this rules file to the loopback-only demo
 Auth/Firestore emulators. `rules.test.js` uses the existing SDK dependencies in
