@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:optolocum/services/auth_service.dart';
 
 import '../../services/real_backend_workflows.dart';
+import '../../services/real_backend_client.dart';
 
 import '../auth/CO_header.dart';
 
@@ -11,7 +12,9 @@ import 'L_signup.dart';
 import '../locum/L_verify_popup.dart';
 
 class LocumSigninPage extends StatefulWidget {
-  const LocumSigninPage({super.key});
+  const LocumSigninPage({super.key, this.workflows, this.destination});
+  final RealBackendWorkflows? workflows;
+  final WidgetBuilder? destination;
 
   @override
   State<LocumSigninPage> createState() => _LocumSigninPageState();
@@ -37,8 +40,8 @@ class _LocumSigninPageState extends State<LocumSigninPage> {
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
     try {
-      if (realBackendEnabled) {
-        final service = realBackendWorkflows;
+      if (realBackendEnabled || widget.workflows != null) {
+        final service = widget.workflows ?? realBackendWorkflows;
         if (service == null) {
           throw StateError('Account access validation is unavailable.');
         }
@@ -54,8 +57,15 @@ class _LocumSigninPageState extends State<LocumSigninPage> {
         );
       }
       if (!mounted) return;
-      Navigator.of(context)
-          .push(MaterialPageRoute<void>(builder: (_) => const LVerifyPopup()));
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: widget.destination ?? (_) => const LVerifyPopup(),
+        ),
+      );
+    } on BackendException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } on StateError catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)

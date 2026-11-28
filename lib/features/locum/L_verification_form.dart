@@ -15,18 +15,17 @@ class LVerificationForm extends StatefulWidget {
   const LVerificationForm({
     super.key,
     this.displayName = '',
-    this.isEditing = false,
     this.submissions,
     this.profileService,
     this.pickDocument,
+    this.onSubmitted,
   });
   final String displayName;
 
-  // false: first-time verification; true: update from the Account tab.
-  final bool isEditing;
   final VerificationSubmissionClient? submissions;
   final LocumProfileService? profileService;
   final Future<XFile?> Function()? pickDocument;
+  final VoidCallback? onSubmitted;
 
   @override
   State<LVerificationForm> createState() => _LVerificationFormState();
@@ -207,11 +206,9 @@ class _LVerificationFormState extends State<LVerificationForm> {
           ),
         ),
       );
-      if (widget.isEditing) {
-        // EDIT MODE: return to the existing profile, keeping its navigation.
-        Navigator.of(context).pop();
+      if (widget.onSubmitted case final callback?) {
+        callback();
       } else {
-        // INITIAL MODE: finish onboarding by opening the main page.
         Navigator.of(context).pushReplacement(
           MaterialPageRoute<void>(builder: (_) => const LMainPage()),
         );
@@ -493,7 +490,6 @@ class _LVerificationFormState extends State<LVerificationForm> {
                                   setState(() => _uploadStep = true);
                                 }
                               },
-                        // The shared upload step has a different final action in edit mode.
                         child: _saving
                             ? const SizedBox(
                                 width: 20,
@@ -503,13 +499,7 @@ class _LVerificationFormState extends State<LVerificationForm> {
                                   color: Colors.white,
                                 ),
                               )
-                            : Text(
-                                _uploadStep
-                                    ? (widget.isEditing
-                                          ? 'Update'
-                                          : 'Save Profile')
-                                    : 'Next',
-                              ),
+                            : Text(_uploadStep ? 'Save Profile' : 'Next'),
                       ),
                     ],
                   ),

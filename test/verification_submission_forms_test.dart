@@ -55,7 +55,7 @@ Future<void> _openLocum(
               context,
               MaterialPageRoute<void>(
                 builder: (_) => LVerificationForm(
-                  isEditing: true,
+                  onSubmitted: () => Navigator.of(context).pop(),
                   profileService: profiles,
                   submissions: submissions,
                   pickDocument: picker,
@@ -206,8 +206,8 @@ void main() {
       client,
       () async => file('evidence${++count}.pdf'),
     );
-    await tester.ensureVisible(find.text('Update'));
-    await tester.tap(find.text('Update'));
+    await tester.ensureVisible(find.text('Save Profile'));
+    await tester.tap(find.text('Save Profile'));
     await tester.pumpAndSettle();
     expect(
       find.text('Choose exactly one PDF, JPG, JPEG, or PNG.'),
@@ -221,8 +221,8 @@ void main() {
     }
     expect(find.text('evidence1.pdf'), findsNothing);
     expect(find.text('evidence2.pdf'), findsOneWidget);
-    await tester.ensureVisible(find.text('Update'));
-    await tester.tap(find.text('Update'));
+    await tester.ensureVisible(find.text('Save Profile'));
+    await tester.tap(find.text('Save Profile'));
     await tester.pumpAndSettle();
     expect(client.received.single.document!.name, 'evidence2.pdf');
     expect(client.received.single.fields['nric'], '990101010101');
@@ -242,8 +242,8 @@ void main() {
       await tester.ensureVisible(find.text('Choose one document'));
       await tester.tap(find.text('Choose one document'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Update'));
-      await tester.tap(find.text('Update'));
+      await tester.ensureVisible(find.text('Save Profile'));
+      await tester.tap(find.text('Save Profile'));
       await tester.pumpAndSettle();
       expect(find.byType(LVerificationForm), findsOneWidget);
       expect(
@@ -253,7 +253,7 @@ void main() {
       verifyNever(() => profiles.save(any()));
       client.fail = false;
       client.pending = Completer<void>();
-      await tester.tap(find.text('Update'));
+      await tester.tap(find.text('Save Profile'));
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.byType(LVerificationForm), findsOneWidget);
       expect(
@@ -279,8 +279,8 @@ void main() {
     await tester.ensureVisible(find.text('Choose one document'));
     await tester.tap(find.text('Choose one document'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Update'));
-    await tester.tap(find.text('Update'));
+    await tester.ensureVisible(find.text('Save Profile'));
+    await tester.tap(find.text('Save Profile'));
     await tester.pumpAndSettle();
     verifyNever(() => profiles.save(any()));
     expect(find.text(DisabledVerificationSubmissions.message), findsOneWidget);

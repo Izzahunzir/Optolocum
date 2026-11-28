@@ -96,7 +96,7 @@ class _LVerifyPopupState extends State<LVerifyPopup> {
                       ),
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
-                        Navigator.of(context).pushReplacement(
+                        Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => LVerificationForm(
                               displayName: widget.displayName,

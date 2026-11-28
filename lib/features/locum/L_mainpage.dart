@@ -3,6 +3,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:optolocum/services/job_service.dart';
 import 'package:optolocum/services/locum_profile_service.dart';
+import 'package:optolocum/services/real_backend_workflows.dart';
 
 import '../../widgets/advertisement_strip.dart';
 import '../../widgets/logout_dialog.dart';
@@ -69,7 +70,12 @@ class _LMainPageState extends State<LMainPage> {
     final confirmed = await showLogoutDialog(context);
     if (confirmed != true || !mounted) return;
     try {
-      await LocumProfileService.instance.signOut();
+      if (realBackendEnabled && realBackendWorkflows != null) {
+        LocumProfileService.instance.clearCache();
+        await realBackendWorkflows!.signOut();
+      } else {
+        await LocumProfileService.instance.signOut();
+      }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -81,6 +87,10 @@ class _LMainPageState extends State<LMainPage> {
     locumVerificationStatus.value = LocumVerificationStatus.unverified;
     locumSavedJobs.clear();
     locumProfileData.value = null;
+    if (realBackendEnabled && realBackendWorkflows != null) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
+    }
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const IntroPage()),
       (_) => false,

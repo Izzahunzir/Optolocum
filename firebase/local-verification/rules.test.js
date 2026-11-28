@@ -41,7 +41,7 @@ beforeEach(async () => {
 });
 after(async () => { if (env) await env.cleanup(); });
 
-test('server-created profiles: own reads and edits, no forged status or privileged fields', async () => {
+test('server-created profiles: own reads, no client edits or forged fields', async () => {
   for (const [uid, collectionName, edit] of [
     ['locum', 'locum_profiles', { phoneNumber: '0123456789' }],
     ['owner', 'practice_owner_profiles', { fullName: 'Updated' }],
@@ -50,7 +50,7 @@ test('server-created profiles: own reads and edits, no forged status or privileg
     await assertSucceeds(getDoc(ref(own, p)));
     await assertFails(getDoc(ref(other, p)));
     await assertFails(getDoc(ref(env.unauthenticatedContext().firestore(), p)));
-    await assertSucceeds(updateDoc(ref(own, p), edit));
+    await assertFails(updateDoc(ref(own, p), edit));
     for (const value of ['unverified', 'pending', 'approved', 'verified', 'rejected']) {
       if (value === 'unverified') continue; // unchanged field writes have no effect
       await assertFails(updateDoc(ref(own, p), { verificationStatus: value }));

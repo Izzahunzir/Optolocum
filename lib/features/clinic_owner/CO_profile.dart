@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../services/real_backend_workflows.dart';
+
 import '../intro/intro_page.dart';
 import '../../widgets/logout_dialog.dart';
 import 'CO_contact_us.dart';
@@ -70,7 +72,11 @@ class COProfile extends StatelessWidget {
     final confirmed = await showLogoutDialog(context);
     if (confirmed != true || !context.mounted) return;
     try {
-      await (auth ?? FirebaseAuth.instance).signOut();
+      if (auth == null && realBackendEnabled && realBackendWorkflows != null) {
+        await realBackendWorkflows!.signOut();
+      } else {
+        await (auth ?? FirebaseAuth.instance).signOut();
+      }
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -80,6 +86,10 @@ class COProfile extends StatelessWidget {
     }
     if (!context.mounted) return;
     coVerificationStatus.value = COVerificationStatus.unverified;
+    if (auth == null && realBackendEnabled && realBackendWorkflows != null) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
+    }
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const IntroPage()),
       (_) => false,

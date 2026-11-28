@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:optolocum/features/locum/L_mainpage.dart';
 
+// Test double for the Firestore plugin's sealed snapshot interface.
+// ignore: subtype_of_sealed_class
 class _Document extends Fake
     implements QueryDocumentSnapshot<Map<String, dynamic>> {
   _Document(this.id, this.values);

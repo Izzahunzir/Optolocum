@@ -61,14 +61,14 @@ void main() {
     },
   );
 
-  test('legacy verified profiles normalize to approved without inference', () {
+  test('legacy verified profiles do not confer approval', () {
     final legacy = LocumProfileData.fromFirestore('legacy', {
       'verificationStatus': 'verified',
     });
     final approved = LocumProfileData.fromFirestore('approved', {
       'verificationStatus': 'approved',
     });
-    expect(legacy.verificationStatus, 'approved');
+    expect(legacy.verificationStatus, 'unverified');
     expect(approved.verificationStatus, 'approved');
     expect(
       LocumProfileData.fromFirestore('missing', {}).verificationStatus,

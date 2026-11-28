@@ -12,7 +12,9 @@ import 'L_forgotpass.dart';
 import '../locum/L_verify_popup.dart';
 
 class LocumSignupPage extends StatefulWidget {
-  const LocumSignupPage({super.key});
+  const LocumSignupPage({super.key, this.workflows, this.destination});
+  final RealBackendWorkflows? workflows;
+  final WidgetBuilder? destination;
 
   @override
   State<LocumSignupPage> createState() => _LocumSignupPageState();
@@ -41,8 +43,8 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
     setState(() => _isSubmitting = true);
     _formKey.currentState!.save();
     try {
-      if (realBackendEnabled) {
-        final service = realBackendWorkflows;
+      if (realBackendEnabled || widget.workflows != null) {
+        final service = widget.workflows ?? realBackendWorkflows;
         if (service == null) throw StateError('Backend is unavailable.');
         await service.enroll(
           email: emailController.text,
@@ -70,7 +72,8 @@ class _LocumSignupPageState extends State<LocumSignupPage> {
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => LVerifyPopup(displayName: _fullName),
+          builder:
+              widget.destination ?? (_) => LVerifyPopup(displayName: _fullName),
         ),
       );
     } on BackendException catch (e) {

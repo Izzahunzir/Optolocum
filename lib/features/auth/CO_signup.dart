@@ -8,9 +8,12 @@ import '../../services/real_backend_workflows.dart';
 import '../../services/real_backend_client.dart';
 
 import 'CO_header.dart';
+import '../clinic_owner/CO_verify_popup.dart';
 
 class CompanyOwnerSignupPage extends StatefulWidget {
-  const CompanyOwnerSignupPage({super.key});
+  const CompanyOwnerSignupPage({super.key, this.workflows, this.destination});
+  final RealBackendWorkflows? workflows;
+  final WidgetBuilder? destination;
 
   @override
   State<CompanyOwnerSignupPage> createState() => _CompanyOwnerSignupPageState();
@@ -48,9 +51,11 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
     final phoneNumber = phoneNumberController.text.trim();
     final role = _selectedRole!;
     try {
-      if (realBackendEnabled || demoEnrollmentEnabled) {
-        if (realBackendEnabled) {
-          final service = realBackendWorkflows;
+      if (realBackendEnabled ||
+          widget.workflows != null ||
+          demoEnrollmentEnabled) {
+        if (realBackendEnabled || widget.workflows != null) {
+          final service = widget.workflows ?? realBackendWorkflows;
           if (service == null) throw StateError('Backend is unavailable.');
           await service.enroll(
             email: email,
@@ -79,6 +84,14 @@ class _CompanyOwnerSignupPageState extends State<CompanyOwnerSignupPage> {
           );
         }
         if (!mounted) return;
+        if (realBackendEnabled || widget.workflows != null) {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: widget.destination ?? (_) => const COVerifyPopup(),
+            ),
+          );
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Account created successfully. You can now log in.'),

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:async';
 
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -36,56 +37,175 @@ class RealBackendWorkflows implements VerificationSubmissionClient {
   final Duration enrollmentDelay;
   bool _enrolling = false;
   bool _submitting = false;
+  String? _activeUid;
+  int _accountGeneration = 0;
   static const _enrollmentKey = 'real_enrollment_recovery_v1';
+  static String _sessionKey(String uid) => 'real_session_hint_v1_$uid';
 
-  /// Fail closed until the trusted session-validation endpoint is implemented.
+  /// Removes only the specified account's non-secret routing hint.
+  Future<void> clearSessionHint(String uid) =>
+      storage.delete(key: _sessionKey(uid));
+
+  /// Watches external Firebase sign-outs and account switches as well as app logout.
+  StreamSubscription<User?> watchAccountChanges({
+    void Function()? onValidatedAccountChanged,
+  }) {
+    var previousUid = auth.currentUser?.uid;
+    return auth.authStateChanges().listen((user) {
+      final oldUid = previousUid;
+      previousUid = user?.uid;
+      if (oldUid != null && oldUid != user?.uid) {
+        _accountGeneration++;
+        unawaited(clearSessionHint(oldUid).catchError((Object _) {}));
+        if (_activeUid == oldUid) {
+          _activeUid = null;
+          onValidatedAccountChanged?.call();
+        }
+      }
+    });
+  }
+
+  Future<void> _validateAndRemember(User user, String accountType) async {
+    final generation = _accountGeneration;
+    await validateSession(accountType, expectedUser: user);
+    try {
+      await storage.write(key: _sessionKey(user.uid), value: accountType);
+      if (auth.currentUser?.uid != user.uid ||
+          generation != _accountGeneration) {
+        await clearSessionHint(user.uid);
+        throw StateError('Your account changed. Please sign in again.');
+      }
+      _activeUid = user.uid;
+    } catch (_) {
+      if (auth.currentUser?.uid != user.uid ||
+          generation == _accountGeneration) {
+        try {
+          await clearSessionHint(user.uid);
+        } catch (_) {}
+      }
+      if (auth.currentUser?.uid == user.uid &&
+          generation == _accountGeneration) {
+        await auth.signOut();
+      }
+      throw StateError(
+        'Your session could not be saved. Please sign in again.',
+      );
+    }
+  }
+
+  /// A hint selects the request; only a successful server response grants entry.
+  Future<({String uid, String accountType})?> restoreSession() async {
+    final user = auth.currentUser;
+    if (user == null) return null;
+    final generation = _accountGeneration;
+    try {
+      final type = await storage.read(key: _sessionKey(user.uid));
+      if (auth.currentUser?.uid != user.uid ||
+          generation != _accountGeneration) {
+        throw StateError('Your account changed. Please sign in again.');
+      }
+      if (type != 'locum' && type != 'practice_owner') {
+        throw StateError('Please sign in again to confirm your account.');
+      }
+      await _validateAndRemember(user, type!);
+      return (uid: user.uid, accountType: type);
+    } catch (_) {
+      if (auth.currentUser?.uid != user.uid ||
+          generation == _accountGeneration) {
+        try {
+          await clearSessionHint(user.uid);
+        } catch (_) {}
+      }
+      if (auth.currentUser?.uid == user.uid &&
+          generation == _accountGeneration) {
+        await auth.signOut();
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> signOut() async {
+    final uid = auth.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      await clearSessionHint(uid);
+    } finally {
+      if (auth.currentUser?.uid == uid) await auth.signOut();
+    }
+  }
+
+  /// Confirms both Firebase identity and trusted access before navigation.
+  Future<void> validateSession(String accountType, {User? expectedUser}) async {
+    final user = expectedUser ?? auth.currentUser;
+    final generation = _accountGeneration;
+    if (user == null ||
+        !const ['locum', 'practice_owner'].contains(accountType)) {
+      throw StateError(
+        'Your session could not be confirmed. Please sign in again.',
+      );
+    }
+    try {
+      if (auth.currentUser?.uid != user.uid ||
+          generation != _accountGeneration) {
+        throw StateError('Your account changed. Please sign in again.');
+      }
+      final token = await user.getIdToken(true);
+      if (token == null ||
+          token.isEmpty ||
+          auth.currentUser?.uid != user.uid ||
+          generation != _accountGeneration) {
+        throw StateError(
+          'Your session could not be confirmed. Please sign in again.',
+        );
+      }
+      final result = await backend.postJson('/api/session/validate', {
+        'accountType': accountType,
+      }, token: token);
+      final data = result['data'];
+      if (auth.currentUser?.uid != user.uid ||
+          generation != _accountGeneration ||
+          data is! Map ||
+          data['uid'] is! String ||
+          data['uid'] != user.uid ||
+          data['accountType'] != accountType ||
+          data['access'] != 'active') {
+        throw StateError(
+          'Your account access could not be confirmed. Please sign in again.',
+        );
+      }
+    } catch (_) {
+      if (auth.currentUser?.uid == user.uid && generation == _accountGeneration)
+        await auth.signOut();
+      rethrow;
+    }
+  }
+
   Future<void> signIn({
     required String email,
     required String password,
     required String accountType,
   }) async {
+    final previousUid = auth.currentUser?.uid;
+    if (previousUid != null) await clearSessionHint(previousUid);
+    late final UserCredential credential;
     try {
-      final credential = await auth.signInWithEmailAndPassword(
+      credential = await auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
-      final user = credential.user;
-      if (user == null || auth.currentUser?.uid != user.uid) {
-        throw StateError(
-          'Your session could not be confirmed. Please sign in again.',
-        );
-      }
-      final token = await user.getIdToken(true);
-      if (token == null || token.isEmpty || auth.currentUser?.uid != user.uid) {
-        throw StateError(
-          'Your session could not be confirmed. Please sign in again.',
-        );
-      }
-      final assignment = await firestore
-          .collection('account_management')
-          .doc(user.uid)
-          .get(const GetOptions(source: Source.server));
-      if (auth.currentUser?.uid != user.uid ||
-          assignment.data()?['trustedAccountType'] != accountType) {
-        throw StateError(
-          'This account is not assigned to the selected account type.',
-        );
-      }
-      throw StateError(
-        'Account access validation is not available yet. Please try again later.',
-      );
     } on FirebaseAuthException {
-      await auth.signOut();
+      if (previousUid != null && auth.currentUser?.uid == previousUid) {
+        await auth.signOut();
+      }
       rethrow;
-    } on StateError {
-      await auth.signOut();
-      rethrow;
-    } catch (_) {
-      await auth.signOut();
+    }
+    final user = credential.user;
+    if (user == null || auth.currentUser?.uid != user.uid) {
       throw StateError(
-        'Account access could not be confirmed. Please try again later.',
+        'Your session could not be confirmed. Please sign in again.',
       );
     }
+    await _validateAndRemember(user, accountType);
   }
 
   Future<void> enroll({
@@ -139,37 +259,20 @@ class RealBackendWorkflows implements VerificationSubmissionClient {
         );
       }
       await Future<void>.delayed(enrollmentDelay);
+      final previousUid = auth.currentUser?.uid;
+      if (previousUid != null) await clearSessionHint(previousUid);
       final credential = await auth.signInWithEmailAndPassword(
         email: normalized,
         password: password,
       );
       if (credential.user?.uid != data['uid']) {
-        await auth.signOut();
+        if (auth.currentUser?.uid == credential.user?.uid) await auth.signOut();
         throw StateError(
           'The signed-in account did not match signup. Contact support.',
         );
       }
-      try {
-        final assignment = await firestore
-            .collection('account_management')
-            .doc(data['uid'] as String)
-            .get(const GetOptions(source: Source.server));
-        if (assignment.data()?['trustedAccountType'] != accountType ||
-            auth.currentUser?.uid != data['uid']) {
-          throw StateError('Account assignment was not confirmed.');
-        }
-      } catch (_) {
-        await auth.signOut();
-        throw StateError(
-          'Signup is saved, but account access could not be confirmed. Retry or contact support.',
-        );
-      }
-      // An assignment alone does not confirm that account access is active or
-      // that the session has not been revoked. Keep recovery until validated.
-      await auth.signOut();
-      throw StateError(
-        'Signup is saved, but account access validation is not available yet. Retry later.',
-      );
+      await _validateAndRemember(credential.user!, accountType);
+      await storage.delete(key: _enrollmentKey);
     } finally {
       _enrolling = false;
     }
