@@ -100,7 +100,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Waits for Firebase persistence and trusted validation before choosing a home.
+/// Clears any persisted sign-in before showing the sign-in screen.
 class RealSessionStartup extends StatefulWidget {
   const RealSessionStartup({
     super.key,
@@ -131,6 +131,8 @@ class _RealSessionStartupState extends State<RealSessionStartup> {
   Future<({String uid, String accountType})?> _restore() async {
     await widget.workflows.auth.authStateChanges().first;
     if (!mounted) return null;
+    await widget.workflows.signOut();
+    if (!mounted) return null;
     _accountWatcher = widget.workflows.watchAccountChanges(
       onValidatedAccountChanged: () {
         _restoredInvalidated = true;
@@ -143,7 +145,7 @@ class _RealSessionStartupState extends State<RealSessionStartup> {
         });
       },
     );
-    return widget.workflows.restoreSession();
+    return null;
   }
 
   @override

@@ -174,8 +174,9 @@ class RealBackendWorkflows implements VerificationSubmissionClient {
         );
       }
     } catch (_) {
-      if (auth.currentUser?.uid == user.uid && generation == _accountGeneration)
+      if (auth.currentUser?.uid == user.uid && generation == _accountGeneration) {
         await auth.signOut();
+      }
       rethrow;
     }
   }
