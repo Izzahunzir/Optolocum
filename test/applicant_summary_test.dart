@@ -4,7 +4,7 @@ import 'package:optolocum/services/application_service.dart';
 void main() {
   test('summary maps approved and legacy verified statuses consistently', () {
     expect(applicantSummaryStatus('approved'), 'verified');
-    expect(applicantSummaryStatus('verified'), 'verified');
+    expect(applicantSummaryStatus('verified'), 'unverified');
     expect(applicantSummaryStatus('pending'), 'pending');
     expect(applicantSummaryStatus('rejected'), 'unverified');
   });

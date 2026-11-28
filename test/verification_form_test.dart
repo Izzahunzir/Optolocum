@@ -12,8 +12,8 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(const MaterialApp(home: COVerificationForm()));
-      await tester.ensureVisible(find.text('Verify Account'));
-      await tester.tap(find.text('Verify Account'));
+      await tester.ensureVisible(find.text('Next'));
+      await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
       expect(find.text('Select type of practice'), findsOneWidget);
       expect(find.text('Select state'), findsOneWidget);
@@ -35,10 +35,7 @@ void main() {
       await tester.tap(find.text('Johor').last);
       await tester.pumpAndSettle();
       expect(COVerificationForm.states.length, 16);
-      expect(
-        tester.widget<DropdownButtonFormField<String>>(state).initialValue,
-        isNull,
-      );
+      expect(find.text('Johor'), findsOneWidget);
       final fields = find.byType(TextFormField);
       final values = [
         'Vision Clinic',
@@ -52,9 +49,12 @@ void main() {
         await tester.enterText(fields.at(index), values[index]);
       }
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Verify Account'));
-      await tester.ensureVisible(find.text('Verify Account'));
+      await tester.ensureVisible(find.text('Next'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      expect(find.text('Company Information Document Preview'), findsOneWidget);
+      await tester.ensureVisible(find.text('Verify Account'));
       await tester.tap(find.text('Verify Account'));
       await tester.pumpAndSettle();
       expect(

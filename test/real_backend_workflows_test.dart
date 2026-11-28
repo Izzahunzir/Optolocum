@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -73,6 +74,21 @@ void main() {
       ),
     ).thenAnswer((_) async => credential);
     when(() => auth.signOut()).thenAnswer((_) async {});
+    when(
+      () => backend.postJson(
+        '/api/session/validate',
+        any(),
+        token: any(named: 'token'),
+      ),
+    ).thenAnswer(
+      (i) async => {
+        'data': {
+          'uid': 'uid',
+          'accountType': (i.positionalArguments[1] as Map)['accountType'],
+          'access': 'active',
+        },
+      },
+    );
     when(() => db.collection(any())).thenReturn(collection);
     when(() => collection.doc(any())).thenReturn(ref);
     when(() => ref.get(any())).thenAnswer((_) async => snapshot);
@@ -240,51 +256,121 @@ void main() {
         );
         await expectLater(enroll(), throwsA(isA<BackendException>()));
         expect(jsonEncode(saved), isNot(contains('password')));
-        await expectLater(
-          enroll(),
-          throwsStateError,
-        ); // session endpoint is not active
+        await enroll();
         expect(bodies[0]['requestId'], bodies[1]['requestId']);
         expect(bodies[0]['recoverySecret'], bodies[1]['recoverySecret']);
         expect(bodies[1]['email'], 'test@example.com');
-        verify(() => auth.signOut()).called(1);
+        expect(saved, {'real_session_hint_v1_uid': type});
       },
     );
   }
+  test('enrollment recovery survives failed session validation', () async {
+    final bodies = <Map>[];
+    when(() => backend.postJson('/api/enrollment', any()))
+        .thenAnswer((i) async {
+          bodies.add(i.positionalArguments[1] as Map);
+          return {
+            'data': {'uid': 'uid', 'accountType': 'locum'},
+          };
+        });
+    var unavailable = true;
+    when(
+      () => backend.postJson(
+        '/api/session/validate',
+        any(),
+        token: any(named: 'token'),
+      ),
+    ).thenAnswer((_) async {
+      if (unavailable) {
+        throw const BackendException('unavailable', statusCode: 503);
+      }
+      return {
+        'data': {'uid': 'uid', 'accountType': 'locum', 'access': 'active'},
+      };
+    });
+    Future<void> enroll() => service.enroll(
+      email: 'test@example.com',
+      password: 'password',
+      accountType: 'locum',
+      profile: {'fullName': 'Test'},
+    );
+    await expectLater(enroll(), throwsA(isA<BackendException>()));
+    expect(saved.keys, contains('real_enrollment_recovery_v1'));
+    expect(jsonEncode(saved), isNot(contains('password')));
+    unavailable = false;
+    await enroll();
+    expect(bodies[0]['requestId'], bodies[1]['requestId']);
+    expect(bodies[0]['recoverySecret'], bodies[1]['recoverySecret']);
+    expect(saved, {'real_session_hint_v1_uid': 'locum'});
+  });
+  for (final type in ['locum', 'practice_owner']) {
+    test('$type login validates trusted session', () async {
+      await service.signIn(
+        email: 'test@example.com',
+        password: 'password',
+        accountType: type,
+      );
+      verify(
+        () => backend.postJson('/api/session/validate', {
+          'accountType': type,
+        }, token: 'token'),
+      ).called(1);
+    });
+  }
+  for (final invalid in [
+    {'uid': 'other', 'accountType': 'locum', 'access': 'active'},
+    {'uid': 'uid', 'accountType': 'practice_owner', 'access': 'active'},
+    {'uid': 'uid', 'accountType': 'locum'},
+  ]) {
+    test('rejects invalid session $invalid', () async {
+      when(
+        () => backend.postJson(
+          '/api/session/validate',
+          any(),
+          token: any(named: 'token'),
+        ),
+      ).thenAnswer((_) async => {'data': invalid});
+      await expectLater(service.validateSession('locum'), throwsStateError);
+      verify(() => auth.signOut()).called(1);
+    });
+  }
+  for (final code in [400, 401, 403, 503]) {
+    test('session failure $code signs out', () async {
+      when(
+        () => backend.postJson(
+          '/api/session/validate',
+          any(),
+          token: any(named: 'token'),
+        ),
+      ).thenThrow(BackendException('failure', statusCode: code));
+      await expectLater(
+        service.validateSession('locum'),
+        throwsA(isA<BackendException>()),
+      );
+      verify(() => auth.signOut()).called(1);
+    });
+  }
   test(
-    'wrong account type and unavailable session validation both sign out',
+    'account switch during validation rejects without signing out new user',
     () async {
-      assignment = 'practice_owner';
-      await expectLater(
-        service.signIn(
-          email: 'test@example.com',
-          password: 'password',
-          accountType: 'locum',
+      final pending = Completer<Map<String, dynamic>>();
+      when(
+        () => backend.postJson(
+          '/api/session/validate',
+          any(),
+          token: any(named: 'token'),
         ),
-        throwsA(
-          isA<StateError>().having(
-            (e) => e.message,
-            'message',
-            contains('selected account type'),
-          ),
-        ),
-      );
-      assignment = 'locum';
-      await expectLater(
-        service.signIn(
-          email: 'test@example.com',
-          password: 'password',
-          accountType: 'locum',
-        ),
-        throwsA(
-          isA<StateError>().having(
-            (e) => e.message,
-            'message',
-            contains('not available'),
-          ),
-        ),
-      );
-      verify(() => auth.signOut()).called(2);
+      ).thenAnswer((_) => pending.future);
+      final validation = service.validateSession('locum');
+      await Future<void>.delayed(Duration.zero);
+      final other = _User();
+      when(() => other.uid).thenReturn('other');
+      when(() => auth.currentUser).thenReturn(other);
+      pending.complete({
+        'data': {'uid': 'uid', 'accountType': 'locum', 'access': 'active'},
+      });
+      await expectLater(validation, throwsStateError);
+      verifyNever(() => auth.signOut());
     },
   );
   test('invalid authentication never navigates and signs out', () async {
@@ -302,6 +388,5 @@ void main() {
       ),
       throwsA(isA<FirebaseAuthException>()),
     );
-    verify(() => auth.signOut()).called(1);
   });
 }

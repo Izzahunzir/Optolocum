@@ -20,17 +20,19 @@ transition protections. Restricted creates additionally require trusted type,
 approved status and an active session record; see `BUSINESS_PERMISSIONS.md`.
 All allowed client reads and writes require a valid active-session record,
 including administrators. Missing, malformed and transition records fail closed.
-Profiles allow only specified client-editable fields,
-and block edits to status, sensitive Locum fields and arbitrary role/admin fields.
+Profile creation and updates are denied to all clients; trusted servers use the
+Admin SDK to maintain profiles and verification status.
 
-Compatibility must be resolved before any deployment: both signup forms still
-use direct Firebase Auth; Practice Owner signup creates its profile from the
-client, and Locum profile writes can include a new status. These conflict with
-server-controlled creation/status. The candidate also allows owner profile
-edits beyond the current deployed rules. The mobile summary and candidate now
-map `approved` to the existing `verified` summary display value. Verification
-remains gated and mobile enrollment is not connected. Review profile-edit implications,
-legacy accounts and app behavior before activation.
+Real-backend enrollment and verification require trusted server routes; the
+candidate does not authorize legacy direct client profile writes. The mobile
+summary maps canonical `approved` to the existing `verified` display value.
+Review legacy accounts and app behavior before activation.
+
+Real-backend startup uses a UID-bound account-type hint to choose the validation
+request and destination. The hint is not authorization: startup waits for the
+Firebase session and trusted HTTPS validation before showing an account home.
+Missing hints or validation failures return to sign-in; logout and account
+switching clear the previous account's hint.
 
 `firebase.json` explicitly supplies this rules file to the loopback-only demo
 Auth/Firestore emulators. `rules.test.js` uses the existing SDK dependencies in

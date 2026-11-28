@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/real_backend_workflows.dart';
+import '../../services/real_backend_client.dart';
 
 import 'CO_header.dart';
 import 'CO_signup.dart';
@@ -11,10 +12,18 @@ import '../clinic_owner/CO_postingjob.dart';
 import '../clinic_owner/CO_forgotpass.dart';
 
 class CompanyOwnerSigninPage extends StatefulWidget {
-  const CompanyOwnerSigninPage({super.key, this.authService, this.jobsStream});
+  const CompanyOwnerSigninPage({
+    super.key,
+    this.authService,
+    this.jobsStream,
+    this.workflows,
+    this.destination,
+  });
 
   final AuthService? authService;
   final Stream<List<COJobPosting>>? jobsStream;
+  final RealBackendWorkflows? workflows;
+  final WidgetBuilder? destination;
 
   @override
   State<CompanyOwnerSigninPage> createState() => _CompanyOwnerSigninPageState();
@@ -40,8 +49,8 @@ class _CompanyOwnerSigninPageState extends State<CompanyOwnerSigninPage> {
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
     try {
-      if (realBackendEnabled) {
-        final service = realBackendWorkflows;
+      if (realBackendEnabled || widget.workflows != null) {
+        final service = widget.workflows ?? realBackendWorkflows;
         if (service == null) {
           throw StateError('Account access validation is unavailable.');
         }
@@ -59,9 +68,15 @@ class _CompanyOwnerSigninPageState extends State<CompanyOwnerSigninPage> {
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => COVerifyPopup(jobsStream: widget.jobsStream),
+          builder:
+              widget.destination ??
+              (_) => COVerifyPopup(jobsStream: widget.jobsStream),
         ),
       );
+    } on BackendException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } on StateError catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)

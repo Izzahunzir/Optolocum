@@ -8,9 +8,9 @@ import 'real_account_permission.dart';
 
 import 'package:flutter/foundation.dart';
 
-/// Public summary vocabulary uses `verified` for either approved status spelling.
+/// Public summary vocabulary uses `verified` for canonical approved status.
 String applicantSummaryStatus(Object? status) => switch (status) {
-  'approved' || 'verified' => 'verified',
+  'approved' => 'verified',
   'pending' => 'pending',
   _ => 'unverified',
 };

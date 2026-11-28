@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:optolocum/features/locum/L_mainpage.dart';
 import 'package:optolocum/features/locum/L_savedJob.dart';
+import 'package:optolocum/services/locum_profile_service.dart';
+
+class _Profiles extends Mock implements LocumProfileService {}
 
 void main() {
   setUp(locumSavedJobs.clear);
@@ -22,7 +26,17 @@ void main() {
   testWidgets('Profile opens saved jobs and observes shared bookmark changes', (
     tester,
   ) async {
-    await tester.pumpWidget(const MaterialApp(home: LMainPage()));
+    final profiles = _Profiles();
+    when(() => profiles.currentUid).thenReturn(null);
+    when(() => profiles.authStateChanges).thenAnswer((_) => Stream.value(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LMainPage(
+          jobsStream: const Stream.empty(),
+          profileService: profiles,
+        ),
+      ),
+    );
     await tester.tap(find.text('Account'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Saved Job'));

@@ -3,8 +3,15 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'dart:async';
+
 import 'firebase_options.dart';
 import 'features/intro/intro_page.dart';
+import 'features/locum/L_verify_popup.dart';
+import 'features/locum/L_savedJob.dart';
+import 'features/locum/L_profile_data.dart';
+import 'features/clinic_owner/CO_verify_popup.dart';
+import 'features/clinic_owner/CO_verification_status.dart';
 import 'services/verification_status_sync.dart';
 import 'services/demo_enrollment.dart';
 import 'services/real_backend_client.dart';
@@ -46,8 +53,6 @@ Future<void> main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     if (realBackendEnabled) {
-      // Persisted Firebase identity is not proof of current trusted access.
-      await FirebaseAuth.instanceFor(app: app).signOut();
       const url = String.fromEnvironment('OPT_BACKEND_URL');
       final config = RealBackendConfig(
         baseUrl: url,
@@ -66,11 +71,12 @@ Future<void> main() async {
     FirebaseFirestore.instance,
   ).start();
 
-  runApp(const MyApp());
+  runApp(MyApp(workflows: realBackendWorkflows));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, this.workflows});
+  final RealBackendWorkflows? workflows;
 
   @override
   Widget build(BuildContext context) {
@@ -87,9 +93,106 @@ class MyApp extends StatelessWidget {
           },
         ),
       ),
-      home: const IntroPage(),
+      home: workflows == null
+          ? const IntroPage()
+          : RealSessionStartup(workflows: workflows!),
     );
   }
+}
+
+/// Waits for Firebase persistence and trusted validation before choosing a home.
+class RealSessionStartup extends StatefulWidget {
+  const RealSessionStartup({
+    super.key,
+    required this.workflows,
+    this.homeBuilder,
+    this.introBuilder,
+  });
+  final RealBackendWorkflows workflows;
+  final Widget Function(BuildContext, String)? homeBuilder;
+  final WidgetBuilder? introBuilder;
+
+  @override
+  State<RealSessionStartup> createState() => _RealSessionStartupState();
+}
+
+class _RealSessionStartupState extends State<RealSessionStartup> {
+  late final Future<({String uid, String accountType})?> _restoration;
+  StreamSubscription<User?>? _accountWatcher;
+  bool _errorShown = false;
+  bool _restoredInvalidated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoration = _restore();
+  }
+
+  Future<({String uid, String accountType})?> _restore() async {
+    await widget.workflows.auth.authStateChanges().first;
+    if (!mounted) return null;
+    _accountWatcher = widget.workflows.watchAccountChanges(
+      onValidatedAccountChanged: () {
+        _restoredInvalidated = true;
+        locumSavedJobs.clear();
+        locumProfileData.value = null;
+        locumVerificationStatus.value = LocumVerificationStatus.unverified;
+        coVerificationStatus.value = COVerificationStatus.unverified;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+        });
+      },
+    );
+    return widget.workflows.restoreSession();
+  }
+
+  @override
+  void dispose() {
+    _accountWatcher?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      FutureBuilder<({String uid, String accountType})?>(
+        future: _restoration,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasError && !_errorShown) {
+            _errorShown = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              final error = snapshot.error;
+              final message = error is BackendException
+                  ? error.message
+                  : 'Session could not be restored. Please sign in again.';
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text(message)));
+            });
+          }
+          final restored = snapshot.data;
+          if (restored == null) {
+            return widget.introBuilder?.call(context) ?? const IntroPage();
+          }
+          return StreamBuilder<User?>(
+            stream: widget.workflows.auth.authStateChanges(),
+            builder: (context, authSnapshot) {
+              if (_restoredInvalidated ||
+                  widget.workflows.auth.currentUser?.uid != restored.uid) {
+                return widget.introBuilder?.call(context) ?? const IntroPage();
+              }
+              return widget.homeBuilder?.call(context, restored.accountType) ??
+                  (restored.accountType == 'locum'
+                      ? const LVerifyPopup()
+                      : const COVerifyPopup());
+            },
+          );
+        },
+      );
 }
 
 class _DirectPageTransitionBuilder extends PageTransitionsBuilder {
